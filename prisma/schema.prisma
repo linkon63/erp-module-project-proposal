@@ -1,0 +1,93 @@
+// Prisma schema for the prototype ERP (cartons, goods, warehouses, shipments)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Warehouse {
+  id        Int       @id @default(autoincrement())
+  code      String    @unique
+  name      String
+  country   String?
+  address   String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  cartons   Carton[]
+}
+
+model Goods {
+  id           Int       @id @default(autoincrement())
+  name         String    @unique
+  nameCn       String?
+  shippingMark String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  cartons      Carton[]
+}
+
+model Carton {
+  id               Int       @id @default(autoincrement())
+  cartonNo         String    @unique
+  writtenCartonNo  String?
+  trackingNo       String?
+
+  goodsId          Int
+  goods            Goods     @relation(fields: [goodsId], references: [id])
+
+  packNo           String?
+  unitPcs          Int?
+  weightKg         Float?
+  lengthCm         Float?
+  widthCm          Float?
+  heightCm         Float?
+  cbm              Float?
+
+  unitPrice        Float?
+  currencyCode     String?   @default("USD")
+
+  shippingMark     String?
+  remarks          String?
+  copyNumber       String?
+  notes            String?
+
+  warehouseId      Int?
+  warehouse        Warehouse? @relation(fields: [warehouseId], references: [id])
+
+  status           String     @default("AT_CHINA_WH")
+
+  isCombinedCarton Boolean    @default(false)
+  childCartons     String    @default("[]")
+
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model Shipment {
+  id              Int       @id @default(autoincrement())
+  shipmentNo      String    @unique
+  fromWarehouse   String?
+  toWarehouse     String?
+  plannedShipDate DateTime?
+  status          String    @default("PLANNED")
+  cartons         String    @default("[]")
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  name     String
+  email    String
+  role     String
+  location String
+  status   String
+}

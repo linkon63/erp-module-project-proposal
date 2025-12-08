@@ -22,6 +22,29 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel, along with Tailwind CSS v4.
 
+## SQLite data
+
+- Local database lives at `data/app.db`. Prisma schema is in `prisma/schema.prisma`.
+- Seed everything (warehouses, goods, cartons, shipments, users) with:
+
+```bash
+npm run db:seed
+```
+
+- API endpoints:
+  - `GET /api/users` – demo user list
+  - `GET/POST /api/cartons` – add/list cartons
+  - `POST /api/cartons/combine` – combine cartons into one
+  - `GET /api/goods`, `GET /api/warehouses` – lookup data
+  - `GET/POST /api/shipments` – create/list shipments
+- Server utilities live in `src/lib/prisma.ts` (Prisma client) and `src/lib/db.ts` (user helpers).
+
+## Prototype flows
+
+- `/cartons`: form to add cartons, combine cartons, and list inventory.
+- `/shipments`: create and view shipments, with carton numbers assigned.
+- Sidebar on the home page is shadcn/ui powered for navigation demos.
+
 ## UI components (shadcn/ui)
 
 - Component registry is configured in `components.json`.
