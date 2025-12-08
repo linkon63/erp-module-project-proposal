@@ -3,6 +3,7 @@
 import type { FormEvent } from "react"
 import { useEffect, useState } from "react"
 
+import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -178,22 +179,23 @@ export default function CartonsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex max-w-6xl flex-col gap-8 px-6 py-10">
-        <div className="flex flex-col gap-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            Carton Module
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Manage cartons for China and BD warehouses
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Add cartons, view the inventory, and combine cartons into a single
-            larger carton.
-          </p>
-        </div>
+    <AppShell>
+      {() => (
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Carton Module
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Manage cartons for China and BD warehouses
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Add cartons, view the inventory, and combine cartons into a single
+              larger carton.
+            </p>
+          </div>
 
-        <div className="grid gap-6 rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur lg:grid-cols-3">
+          <div className="grid gap-6 rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur lg:grid-cols-3">
           <form className="space-y-4 lg:col-span-2" onSubmit={handleCreateCarton}>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Input
@@ -300,15 +302,15 @@ export default function CartonsPage() {
               Combine
             </Button>
           </form>
-        </div>
-
-        {error ? (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
           </div>
-        ) : null}
 
-        <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
+          {error ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -390,8 +392,9 @@ export default function CartonsPage() {
               </tbody>
             </table>
           </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </AppShell>
   )
 }

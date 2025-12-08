@@ -3,6 +3,7 @@
 import type { FormEvent } from "react"
 import { useEffect, useState } from "react"
 
+import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -103,24 +104,25 @@ export default function ShipmentsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-10">
-        <div className="flex flex-col gap-3">
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-            Shipment Module
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Plan shipments from China to Bangladesh
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Capture shipment details and assign cartons selected from the warehouse inventory.
-          </p>
-        </div>
+    <AppShell>
+      {() => (
+        <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Shipment Module
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Plan shipments from China to Bangladesh
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Capture shipment details and assign cartons selected from the warehouse inventory.
+            </p>
+          </div>
 
-        <form
-          className="grid gap-4 rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur"
-          onSubmit={handleCreateShipment}
-        >
+          <form
+            className="grid gap-4 rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur"
+            onSubmit={handleCreateShipment}
+          >
           <div className="grid gap-3 sm:grid-cols-2">
             <Input
               required
@@ -165,9 +167,9 @@ export default function ShipmentsPage() {
               <span className="text-sm text-destructive">{error}</span>
             ) : null}
           </div>
-        </form>
+          </form>
 
-        <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
+          <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
@@ -227,8 +229,9 @@ export default function ShipmentsPage() {
               </p>
             ) : null}
           </div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </AppShell>
   )
 }
