@@ -72,13 +72,14 @@ export async function GET(req: Request) {
       where: { id },
       include: { goods: true, warehouse: true },
     })
-    if (!carton) {
+    if (!carton || carton.status === "DELETED") {
       return NextResponse.json({ error: "Carton not found" }, { status: 404 })
     }
     return NextResponse.json({ carton: formatCarton(carton) })
   }
 
   const cartons = await prisma.carton.findMany({
+    where: { status: { not: "DELETED" } },
     orderBy: { createdAt: "desc" },
     include: { goods: true, warehouse: true },
   })
@@ -198,8 +199,9 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "id must be a number" }, { status: 400 })
     }
 
-    const deleted = await prisma.carton.delete({
+    const deleted = await prisma.carton.update({
       where: { id },
+      data: { status: "DELETED" },
       include: { goods: true, warehouse: true },
     })
 

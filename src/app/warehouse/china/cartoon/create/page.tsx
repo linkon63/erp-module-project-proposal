@@ -84,6 +84,8 @@ export default function CreateCartonPage() {
   })
   const [timestamp, setTimestamp] = useState(() => new Date())
   const [loadingCarton, setLoadingCarton] = useState(false)
+  const [showBoxModal, setShowBoxModal] = useState(false)
+  const [boxSelected, setBoxSelected] = useState(true)
 
   const defaultWarehouseId = useMemo(
     () => (warehouses[0]?.id ? String(warehouses[0].id) : ""),
@@ -159,6 +161,32 @@ export default function CreateCartonPage() {
   }, [cartonId, defaultWarehouseId])
 
   const isEditing = Boolean(cartonId)
+
+  const openBoxModal = () => {
+    if (!form.cartonNo.trim()) {
+      setMessage("Enter a Carton # before making a box request.")
+      setStatus("error")
+      setTimeout(() => setStatus("idle"), 800)
+      return
+    }
+    setBoxSelected(true)
+    setShowBoxModal(true)
+  }
+
+  const handleBoxRequest = () => {
+    if (!boxSelected) {
+      setMessage("Select the carton to make a box request.")
+      setStatus("error")
+      setTimeout(() => setStatus("idle"), 800)
+      return
+    }
+    if (typeof window !== "undefined") {
+      window.alert(
+        `Box request placed for carton ${form.cartonNo}. (Hook into box request API here.)`
+      )
+    }
+    setShowBoxModal(false)
+  }
 
   const selectedWarehouse =
     warehouses.find((w) => String(w.id) === form.warehouseId) ??
@@ -302,6 +330,7 @@ export default function CreateCartonPage() {
   return (
     <AppShell wide contentClassName="max-w-full">
       {() => (
+        <>
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
@@ -561,6 +590,15 @@ export default function CreateCartonPage() {
                           </span>
                         )}
                         <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={openBoxModal}
+                          disabled={loadingCarton}
+                        >
+                          Box request
+                        </Button>
+                        <Button
                           type="submit"
                           size="sm"
                           disabled={status === "saving" || loadingCarton}
@@ -581,7 +619,140 @@ export default function CreateCartonPage() {
             </div>
           </form>
         </div>
+        {showBoxModal ? (
+          <BoxRequestModal
+            onClose={() => setShowBoxModal(false)}
+            onConfirm={handleBoxRequest}
+            carton={{
+              cartonNo: form.cartonNo || "—",
+              writtenCartonNo: form.writtenCartonNo || "—",
+              goodsNameEn: form.goodsNameEn || "—",
+              goodsNameCn: form.goodsNameCn || "—",
+              trackingNo: form.trackingNo || "—",
+              packNo: form.packNo || "—",
+              unitPcs: form.unitPcs || "—",
+              weightKg: form.weightKg || "—",
+              size: `${form.lengthCm || "—"} / ${form.widthCm || "—"} / ${
+                form.heightCm || "—"
+              }`,
+              cbm: form.cbm || "—",
+              shippingMark: form.shippingMark || "—",
+            }}
+            selected={boxSelected}
+            setSelected={setBoxSelected}
+          />
+        ) : null}
+        </>
       )}
     </AppShell>
+  )
+}
+
+type BoxRequestModalProps = {
+  onClose: () => void
+  onConfirm: () => void
+  carton: {
+    cartonNo: string
+    writtenCartonNo: string
+    goodsNameEn: string
+    goodsNameCn: string
+    trackingNo: string
+    packNo: string
+    unitPcs: string
+    weightKg: string
+    size: string
+    cbm: string
+    shippingMark: string
+  }
+  selected: boolean
+  setSelected: (selected: boolean) => void
+}
+
+function BoxRequestModal({ onClose, onConfirm, carton, selected, setSelected }: BoxRequestModalProps) {
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="w-full max-w-4xl rounded-2xl border border-border bg-card p-6 shadow-xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Box request
+            </p>
+            <h2 className="text-lg font-semibold">Confirm carton for box request</h2>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
+
+        <div className="mt-4 overflow-auto rounded-xl border border-border">
+          <table className="w-full min-w-[1000px] border-collapse text-sm">
+            <thead className="bg-muted/40 text-muted-foreground">
+              <tr>
+                <th className="border border-border px-3 py-2 text-left">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={selected}
+                    onChange={(e) => setSelected(e.target.checked)}
+                    aria-label="Select carton for box request"
+                  />
+                </th>
+                <th className="border border-border px-3 py-2 text-left">Carton #</th>
+                <th className="border border-border px-3 py-2 text-left">Written #</th>
+                <th className="border border-border px-3 py-2 text-left">Name (EN / CN)</th>
+                <th className="border border-border px-3 py-2 text-left">Tracking #</th>
+                <th className="border border-border px-3 py-2 text-left">Pack #</th>
+                <th className="border border-border px-3 py-2 text-left">Unit pcs</th>
+                <th className="border border-border px-3 py-2 text-left">Weight (kg)</th>
+                <th className="border border-border px-3 py-2 text-left">Size (L/W/H)</th>
+                <th className="border border-border px-3 py-2 text-left">CBM</th>
+                <th className="border border-border px-3 py-2 text-left">Shipping mark</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="bg-card">
+                <td className="border border-border px-3 py-2">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={selected}
+                    onChange={(e) => setSelected(e.target.checked)}
+                    aria-label="Select carton for box request"
+                  />
+                </td>
+                <td className="border border-border px-3 py-2 font-semibold text-foreground">
+                  {carton.cartonNo}
+                </td>
+                <td className="border border-border px-3 py-2">{carton.writtenCartonNo}</td>
+                <td className="border border-border px-3 py-2">
+                  <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    <span className="text-sm font-medium text-foreground">
+                      {carton.goodsNameEn}
+                    </span>
+                    <span>{carton.goodsNameCn}</span>
+                  </div>
+                </td>
+                <td className="border border-border px-3 py-2">{carton.trackingNo}</td>
+                <td className="border border-border px-3 py-2">{carton.packNo}</td>
+                <td className="border border-border px-3 py-2">{carton.unitPcs}</td>
+                <td className="border border-border px-3 py-2">{carton.weightKg}</td>
+                <td className="border border-border px-3 py-2">{carton.size}</td>
+                <td className="border border-border px-3 py-2">{carton.cbm}</td>
+                <td className="border border-border px-3 py-2">{carton.shippingMark}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} disabled={!selected}>
+            Request box
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
