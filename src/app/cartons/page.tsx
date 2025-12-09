@@ -179,7 +179,7 @@ export default function CartonsPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell wide>
       {() => (
         <div className="flex flex-col gap-8">
           <div className="flex flex-col gap-3">

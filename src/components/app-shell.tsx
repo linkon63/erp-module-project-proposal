@@ -17,7 +17,6 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import {
   Sidebar,
   SidebarContent,
@@ -99,9 +98,11 @@ const NAV_ITEMS: NavItem[] = [
 
 type AppShellProps = {
   children: (ctx: { activePage: string }) => ReactNode
+  wide?: boolean
+  contentClassName?: string
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, wide = false, contentClassName }: AppShellProps) {
   const pathname = usePathname()
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     Warehouse: true,
@@ -126,12 +127,20 @@ export function AppShell({ children }: AppShellProps) {
     setOpenSections((prev) => ({ ...prev, [label]: !prev[label] }))
   }
 
+  const contentClass = [
+    "w-full",
+    wide ? "max-w-full" : "max-w-5xl",
+    contentClassName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+
   return (
     <SidebarProvider>
-      <div className="bg-gradient-to-br from-background via-background to-muted/40 text-foreground">
-        <div className="flex min-h-screen">
+      <div className="bg-gradient-to-br from-background via-background to-muted/40 text-foreground w-full">
+        <div className="flex min-h-screen w-full">
           <Sidebar collapsible="offcanvas">
-            <SidebarHeader className="border-b border-sidebar-border pb-4">
+            <SidebarHeader className="border-b border-sidebar-border pb-5">
               <div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/60 px-3 py-2">
                 <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground font-semibold">
                   JA
@@ -257,18 +266,10 @@ export function AppShell({ children }: AppShellProps) {
                 </span>
                 <span className="text-lg font-semibold">{activePage}</span>
               </div>
-              <div className="ml-auto flex items-center gap-2">
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/cartons">Cartons</Link>
-                </Button>
-                <Button asChild size="sm" variant="outline">
-                  <Link href="/shipments">Shipments</Link>
-                </Button>
-              </div>
             </header>
 
-            <div className="flex flex-1 items-start justify-center px-6 py-10">
-              <div className="w-full max-w-5xl">{children({ activePage })}</div>
+            <div className="flex flex-1 items-start justify-start px-6 py-10">
+              <div className={contentClass}>{children({ activePage })}</div>
             </div>
           </SidebarInset>
         </div>

@@ -45,7 +45,7 @@ export default function Home() {
   }, []);
 
   return (
-    <AppShell>
+    <AppShell wide>
       {({ activePage }) => {
         const activeDescription = `${activePage} — Coming soon`;
 

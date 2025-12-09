@@ -4,7 +4,7 @@ import { AppShell } from "@/components/app-shell"
 
 export default function HongkongWarehousePage() {
   return (
-    <AppShell>
+    <AppShell wide>
       {() => (
         <div className="mx-auto flex max-w-4xl flex-col items-center justify-center gap-8">
           <div className="flex flex-col gap-2 text-center">
