@@ -82,7 +82,11 @@ export default function BoxRequestPage() {
       return
     }
     if (!bulkCartonNo.trim()) {
-      setError("Printed Carton # is required.")
+      if (typeof window !== "undefined") {
+        window.alert("Printed Carton # is required.")
+      } else {
+        setError("Printed Carton # is required.")
+      }
       return
     }
     try {
