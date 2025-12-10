@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Pencil, Trash2 } from "lucide-react"
 
@@ -46,9 +46,7 @@ export default function ChinaWarehousePage() {
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [showShipmentModal, setShowShipmentModal] = useState(false)
   const [shipmentRate, setShipmentRate] = useState("5")
-  const [shipmentNo, setShipmentNo] = useState(
-    `SHIP-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`
-  )
+  const [shipmentNo, setShipmentNo] = useState(`SHIP-${Date.now()}`)
   const [creatingShipment, setCreatingShipment] = useState(false)
   const [modalSelectedIds, setModalSelectedIds] = useState<Set<number>>(new Set())
   const [showBoxRequestModal, setShowBoxRequestModal] = useState(false)
@@ -75,16 +73,32 @@ export default function ChinaWarehousePage() {
     load()
   }, [])
 
+  const isShippedStatus = (status: string | null | undefined) => {
+    const value = (status ?? "").toUpperCase()
+    return value.startsWith("IN_SHIPMENT") || value.startsWith("SHIPPED") || value.startsWith("SHIP")
+  }
+
+  const isHidden = useCallback(
+    (carton: Carton) =>
+      carton.status === "BOX_REQUEST_PENDING" || isShippedStatus(carton.status),
+    []
+  )
+
+  const visibleCartons = useMemo(
+    () => cartons.filter((c) => !isHidden(c)),
+    [cartons, isHidden]
+  )
+
   const allSelected = useMemo(
-    () => cartons.length > 0 && selected.size === cartons.length,
-    [cartons.length, selected.size]
+    () => visibleCartons.length > 0 && selected.size === visibleCartons.length,
+    [visibleCartons.length, selected.size]
   )
 
   const toggleAll = () => {
     if (allSelected) {
       setSelected(new Set())
     } else {
-      setSelected(new Set(cartons.map((c) => c.id)))
+      setSelected(new Set(visibleCartons.map((c) => c.id)))
     }
   }
 
@@ -115,7 +129,7 @@ export default function ChinaWarehousePage() {
   const groupedDisplay = useMemo(() => {
     const groups: { cartonNo: string; items: Carton[] }[] = []
     display
-      .filter((c) => c.status !== "BOX_REQUEST_PENDING")
+      .filter((c) => !isHidden(c))
       .forEach((carton) => {
         const key = carton.cartonNo ?? ""
         const last = groups[groups.length - 1]
@@ -126,10 +140,11 @@ export default function ChinaWarehousePage() {
         }
       })
     return groups
-  }, [display])
+  }, [display, isHidden])
+
   const selectedCartons = useMemo(
-    () => cartons.filter((c) => selected.has(c.id)),
-    [cartons, selected]
+    () => visibleCartons.filter((c) => selected.has(c.id)),
+    [visibleCartons, selected]
   )
 
   const modalSelectedCartons = useMemo(
@@ -187,9 +202,12 @@ export default function ChinaWarehousePage() {
 
   const openShipmentModal = () => {
     if (selected.size === 0) {
-      setError("Select at least one carton before creating a shipment.")
+      if (typeof window !== "undefined") {
+        window.alert("Select at least one carton before creating a shipment.")
+      }
       return
     }
+    setShipmentNo((prev) => (prev.trim() ? prev : `SHIP-${Date.now()}`))
     setModalSelectedIds(new Set(selected))
     setShowShipmentModal(true)
   }
@@ -219,14 +237,26 @@ export default function ChinaWarehousePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           shipmentNo: shipmentNo || `SHIP-${Date.now()}`,
+          cartonIds: modalSelectedCartons.map((c) => c.id),
           cartonNos: modalSelectedCartons.map((c) => c.cartonNo),
+          totalPrice: estimatedPrice,
           status: "PLANNED",
         }),
       })
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null
-        throw new Error(body?.error ?? "Unable to create shipment")
+        const message = body?.error ?? "Unable to create shipment"
+        if (typeof window !== "undefined") {
+          window.alert(message)
+        }
+        throw new Error(message)
       }
+      const shippedIds = new Set(modalSelectedCartons.map((c) => c.id))
+      setCartons((prev) =>
+        prev.map((c) =>
+          shippedIds.has(c.id) ? { ...c, status: "IN_SHIPMENT" } : c
+        )
+      )
       setShowShipmentModal(false)
       setSelected(new Set())
     } catch (err) {
@@ -470,16 +500,23 @@ export default function ChinaWarehousePage() {
                       </td>
                       </tr>
                     ) : (
-                      groupedDisplay.map((group) =>
-                        group.items.map((carton, idx) => {
-                          const groupIds = group.items.map((item) => item.id)
-                          const groupSelected = groupIds.every((id) => selected.has(id))
-                          const groupPartial =
-                            !groupSelected && groupIds.some((id) => selected.has(id))
+                      groupedDisplay.map((group) => {
+                        const selectableIds = group.items
+                          .filter((item) => !isShippedStatus(item.status))
+                          .map((item) => item.id)
+                        const groupSelected =
+                          selectableIds.length > 0 &&
+                          selectableIds.every((id) => selected.has(id))
+                        const groupPartial =
+                          !groupSelected && selectableIds.some((id) => selected.has(id))
+                        return group.items.map((carton, idx) => {
                           const requested = carton.status?.toUpperCase().startsWith("BOX")
+                          const shipped = isShippedStatus(carton.status)
                           const rowClasses = requested
                             ? "bg-blue-100 hover:bg-blue-200"
-                            : "bg-card hover:bg-muted/30"
+                            : shipped
+                              ? "bg-muted/40"
+                              : "bg-card hover:bg-muted/30"
                           return (
                             <tr key={carton.id} className={rowClasses}>
                               {idx === 0 ? (
@@ -494,8 +531,9 @@ export default function ChinaWarehousePage() {
                                     ref={(el) => {
                                       if (el) el.indeterminate = groupPartial
                                     }}
-                                    onChange={() => toggleGroup(groupIds)}
+                                    onChange={() => toggleGroup(selectableIds)}
                                     aria-label={`Select carton group ${carton.cartonNo}`}
+                                    disabled={selectableIds.length === 0}
                                   />
                                 </td>
                               ) : null}
@@ -601,7 +639,7 @@ export default function ChinaWarehousePage() {
                             </tr>
                           )
                         })
-                      )
+                      })
                     )}
                   </tbody>
                 </table>
@@ -655,8 +693,6 @@ function ShipmentModal({
   onConfirm,
   onToggleOne,
   onToggleAll,
-  onConfirmBoxRequest,
-  creatingBox,
   modalSelectedIds,
   modalSelectableIds,
   selectedCartons,
@@ -673,8 +709,6 @@ function ShipmentModal({
   onConfirm: () => void
   onToggleOne: (id: number) => void
   onToggleAll: () => void
-  onConfirmBoxRequest: () => void
-  creatingBox: boolean
   modalSelectedIds: Set<number>
   modalSelectableIds: number[]
   selectedCartons: Carton[]
