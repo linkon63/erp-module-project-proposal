@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic"
 
 type BoxRequestItem = {
   cartonId: number
-  printedCartonNo: string
+  printedCartonNo?: string
   notes?: string
 }
 
@@ -32,18 +32,16 @@ function normalizeRequests(body: BoxRequestPayload): BoxRequestItem[] {
       .map((req) => ({
         cartonId: Number(req?.cartonId),
         printedCartonNo:
-          typeof req?.printedCartonNo === "string" ? req.printedCartonNo.trim() : "",
+          typeof req?.printedCartonNo === "string" ? req.printedCartonNo.trim() : undefined,
         notes: typeof req?.notes === "string" ? req.notes : undefined,
       }))
-      .filter(
-        (req) => Number.isInteger(req.cartonId) && req.cartonId > 0 && Boolean(req.printedCartonNo)
-      )
+      .filter((req) => Number.isInteger(req.cartonId) && req.cartonId > 0)
   }
 
   // fallback: single printedCartonNo applied to cartonIds array
   const ids = parseIds(body.cartonIds)
-  const printed = body.printedCartonNo?.trim()
-  if (ids.length && printed) {
+  const printed = body.printedCartonNo?.trim() || undefined
+  if (ids.length) {
     return ids.map((id) => ({ cartonId: id, printedCartonNo: printed, notes: body.notes }))
   }
 
@@ -68,7 +66,7 @@ export async function POST(req: Request) {
 
     if (!requests.length) {
       return NextResponse.json(
-        { error: "requests with printedCartonNo are required" },
+        { error: "requests array is required" },
         { status: 400 }
       )
     }
@@ -91,27 +89,19 @@ export async function POST(req: Request) {
           tx.boxRequest.create({
             data: {
               cartonId: req.cartonId,
-              printedCartonNo: req.printedCartonNo,
+              printedCartonNo: req.printedCartonNo ?? null,
               notes: req.notes ?? body.notes ?? undefined,
-              status: "APPROVED",
+              status: "PENDING",
             },
             include: { carton: true },
           })
         )
       )
 
-      await Promise.all(
-        requests.map((req) =>
-          tx.carton.update({
-            where: { id: req.cartonId },
-            data: {
-              cartonNo: req.printedCartonNo,
-              printedCartonNo: req.printedCartonNo,
-              status: "BOX_REQUESTED",
-            },
-          })
-        )
-      )
+      await tx.carton.updateMany({
+        where: { id: { in: cartonIds } },
+        data: { status: "BOX_REQUEST_PENDING" },
+      })
 
       return createdRequests
     })
@@ -132,6 +122,83 @@ export async function PUT(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
     const idParam = searchParams.get("id")
+    const body = (await req.json()) as BoxRequestPayload
+    const printedCartonNo =
+      body.printedCartonNo?.trim() ?? body.requests?.[0]?.printedCartonNo?.trim()
+
+    const bulkIds = Array.isArray(body.requests)
+      ? body.requests
+          .map((r) => {
+            const maybeId =
+              // support { id }, { requestId }, or { cartonId }
+              (typeof r === "object" && r !== null && "id" in r && (r as { id?: unknown }).id) ??
+              (typeof r === "object" && r !== null && "requestId" in r && (r as { requestId?: unknown }).requestId) ??
+              (typeof r === "object" && r !== null && "cartonId" in r && (r as { cartonId?: unknown }).cartonId)
+            const num = Number(maybeId)
+            return Number.isInteger(num) && num > 0 ? num : null
+          })
+          .filter((n): n is number => n !== null)
+      : []
+
+    const explicitRequestIds = Array.isArray((body as { requestIds?: unknown }).requestIds)
+      ? (body as { requestIds?: unknown }).requestIds!
+          .map((id: unknown) => Number(id))
+          .filter((id: number) => Number.isInteger(id) && id > 0)
+      : []
+
+    const idsToApprove = explicitRequestIds.length ? explicitRequestIds : bulkIds
+
+    // Bulk approve path
+    if (!idParam && idsToApprove.length) {
+      if (!printedCartonNo) {
+        return NextResponse.json(
+          { error: "printedCartonNo is required" },
+          { status: 400 }
+        )
+      }
+
+      const requests = await prisma.boxRequest.findMany({
+        where: { id: { in: idsToApprove } },
+        include: { carton: true },
+      })
+      if (requests.length !== idsToApprove.length) {
+        return NextResponse.json(
+          { error: "One or more box requests not found" },
+          { status: 404 }
+        )
+      }
+
+      const cartonIds = requests.map((r) => r.cartonId)
+
+      const updated = await prisma.$transaction(async (tx) => {
+        await tx.boxRequest.updateMany({
+          where: { id: { in: idsToApprove } },
+          data: {
+            printedCartonNo,
+            notes: body.notes ?? undefined,
+            status: "APPROVED",
+          },
+        })
+
+        await tx.carton.updateMany({
+          where: { id: { in: cartonIds } },
+          data: {
+            cartonNo: printedCartonNo,
+            printedCartonNo,
+            status: "AT_CHINA_WH",
+          },
+        })
+
+        return tx.boxRequest.findMany({
+          where: { id: { in: idsToApprove } },
+          include: { carton: { include: { goods: true, warehouse: true } } },
+        })
+      })
+
+      return NextResponse.json({ requests: updated })
+    }
+
+    // Single approve path
     if (!idParam) {
       return NextResponse.json({ error: "id is required" }, { status: 400 })
     }
@@ -139,10 +206,6 @@ export async function PUT(req: Request) {
     if (Number.isNaN(id)) {
       return NextResponse.json({ error: "id must be a number" }, { status: 400 })
     }
-
-    const body = (await req.json()) as BoxRequestPayload
-    const printedCartonNo =
-      body.printedCartonNo?.trim() ?? body.requests?.[0]?.printedCartonNo?.trim()
 
     if (!printedCartonNo) {
       return NextResponse.json(
@@ -175,7 +238,7 @@ export async function PUT(req: Request) {
         data: {
           cartonNo: printedCartonNo,
           printedCartonNo,
-          status: "BOX_REQUESTED",
+          status: "AT_CHINA_WH",
         },
       })
 

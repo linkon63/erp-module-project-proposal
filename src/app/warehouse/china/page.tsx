@@ -53,7 +53,7 @@ export default function ChinaWarehousePage() {
   const [modalSelectedIds, setModalSelectedIds] = useState<Set<number>>(new Set())
   const [showBoxRequestModal, setShowBoxRequestModal] = useState(false)
   const [boxModalSelectedIds, setBoxModalSelectedIds] = useState<Set<number>>(new Set())
-  const [printedCartonNumber, setPrintedCartonNumber] = useState("")
+  const [boxRequestNote, setBoxRequestNote] = useState("")
   const [creatingBox, setCreatingBox] = useState(false)
 
   useEffect(() => {
@@ -88,19 +88,45 @@ export default function ChinaWarehousePage() {
     }
   }
 
-  const toggleOne = (id: number) => {
+  const toggleGroup = (ids: number[]) => {
     setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(id)) {
-        next.delete(id)
+      const allInGroupSelected = ids.every((id) => next.has(id))
+      if (allInGroupSelected) {
+        ids.forEach((id) => next.delete(id))
       } else {
-        next.add(id)
+        ids.forEach((id) => next.add(id))
       }
       return next
     })
   }
 
-  const display = cartons
+  const display = useMemo(() => {
+    return [...cartons].sort((a, b) => {
+      const aNo = (a.cartonNo || "").toUpperCase()
+      const bNo = (b.cartonNo || "").toUpperCase()
+      if (aNo === bNo) {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      }
+      return aNo.localeCompare(bNo)
+    })
+  }, [cartons])
+
+  const groupedDisplay = useMemo(() => {
+    const groups: { cartonNo: string; items: Carton[] }[] = []
+    display
+      .filter((c) => c.status !== "BOX_REQUEST_PENDING")
+      .forEach((carton) => {
+        const key = carton.cartonNo ?? ""
+        const last = groups[groups.length - 1]
+        if (last && last.cartonNo === key) {
+          last.items.push(carton)
+        } else {
+          groups.push({ cartonNo: key, items: [carton] })
+        }
+      })
+    return groups
+  }, [display])
   const selectedCartons = useMemo(
     () => cartons.filter((c) => selected.has(c.id)),
     [cartons, selected]
@@ -170,12 +196,13 @@ export default function ChinaWarehousePage() {
 
   const openBoxRequestModal = () => {
     if (selected.size === 0) {
-      setError("Select at least one carton for a box request.")
+      if (typeof window !== "undefined") {
+        window.alert("Please select the carton you want to make a box request for.")
+      }
       return
     }
     setBoxModalSelectedIds(new Set(selected))
-    const first = selectedCartons[0]
-    setPrintedCartonNumber(first?.printedCartonNo ?? first?.cartonNo ?? "")
+    setBoxRequestNote("")
     setShowBoxRequestModal(true)
   }
 
@@ -285,15 +312,9 @@ export default function ChinaWarehousePage() {
       return
     }
 
-    const trimmedPrinted = printedCartonNumber.trim()
-    if (!trimmedPrinted) {
-      setError("Enter a printed carton # for the selected cartons.")
-      return
-    }
-
     const requestPayload = ids.map((id) => ({
       cartonId: id,
-      printedCartonNo: trimmedPrinted,
+      notes: boxRequestNote.trim() || undefined,
     }))
 
     try {
@@ -323,7 +344,6 @@ export default function ChinaWarehousePage() {
       )
       setSelected(new Set())
       setBoxModalSelectedIds(new Set())
-      setPrintedCartonNumber("")
       setShowBoxRequestModal(false)
     } catch (err) {
       console.error(err)
@@ -457,118 +477,138 @@ export default function ChinaWarehousePage() {
                       </td>
                       </tr>
                     ) : (
-                      display.map((carton) => {
-                        const requested = carton.status?.toUpperCase().startsWith("BOX")
-                        const rowClasses = requested
-                          ? "bg-blue-100 hover:bg-blue-200"
-                          : "bg-card hover:bg-muted/30"
-                        return (
-                        <tr key={carton.id} className={rowClasses}>
-                          <td className="border border-border px-3 py-2">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={selected.has(carton.id)}
-                              onChange={() => toggleOne(carton.id)}
-                              aria-label={`Select carton ${carton.cartonNo}`}
-                            />
-                          </td>
-                          <td className="border border-border px-3 py-2 font-semibold text-foreground">
-                            {carton.cartonNo}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.writtenCartonNo ?? "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                              <span className="text-sm font-medium text-foreground">
-                                {carton.goods?.name ?? "—"}
-                              </span>
-                              <span>{carton.goods?.nameCn ?? "—"}</span>
-                            </div>
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.trackingNo ?? "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.packNo ?? "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.unitPcs ?? "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.weightKg ?? "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            <div className="flex flex-col text-xs text-muted-foreground">
-                              <span className="text-foreground">
-                                L: {carton.lengthCm ?? "—"}
-                              </span>
-                              <span>
-                                W: {carton.widthCm ?? "—"}
-                              </span>
-                              <span>
-                                H: {carton.heightCm ?? "—"}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.cbm ?? "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.shippingMark ?? "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.copyNumber ?? "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.remarks ?? "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.notes ?? "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {carton.childCartons && carton.childCartons.length
-                              ? carton.childCartons.join(", ")
-                              : "—"}
-                          </td>
-                          <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
-                            {new Date(carton.createdAt).toLocaleString()}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            <div className="flex flex-wrap justify-center gap-2">
-                              <Button
-                                asChild
-                                size="sm"
-                                variant="outline"
-                                className="h-8 px-2 text-xs"
-                              >
-                                <Link href={`/warehouse/china/cartoon/create?cartonId=${carton.id}`}>
-                                  <span className="flex items-center gap-1">
-                                    <Pencil className="h-3.5 w-3.5" />
-                                    Edit
+                      groupedDisplay.map((group) =>
+                        group.items.map((carton, idx) => {
+                          const groupIds = group.items.map((item) => item.id)
+                          const groupSelected = groupIds.every((id) => selected.has(id))
+                          const groupPartial =
+                            !groupSelected && groupIds.some((id) => selected.has(id))
+                          const requested = carton.status?.toUpperCase().startsWith("BOX")
+                          const rowClasses = requested
+                            ? "bg-blue-100 hover:bg-blue-200"
+                            : "bg-card hover:bg-muted/30"
+                          return (
+                            <tr key={carton.id} className={rowClasses}>
+                              {idx === 0 ? (
+                                <td
+                                  className="border border-border px-3 py-2"
+                                  rowSpan={group.items.length}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4"
+                                    checked={groupSelected}
+                                    ref={(el) => {
+                                      if (el) el.indeterminate = groupPartial
+                                    }}
+                                    onChange={() => toggleGroup(groupIds)}
+                                    aria-label={`Select carton group ${carton.cartonNo}`}
+                                  />
+                                </td>
+                              ) : null}
+                              {idx === 0 ? (
+                                <td
+                                  className="border border-border px-3 py-2 font-semibold text-foreground align-middle"
+                                  rowSpan={group.items.length}
+                                >
+                                  {carton.cartonNo}
+                                </td>
+                              ) : null}
+                              <td className="border border-border px-3 py-2">
+                                {carton.writtenCartonNo ?? "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                  <span className="text-sm font-medium text-foreground">
+                                    {carton.goods?.name ?? "—"}
                                   </span>
-                                </Link>
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                className="h-8 px-2 text-xs"
-                                disabled={deletingId === carton.id}
-                                onClick={() => handleDelete(carton.id, carton.cartonNo)}
-                              >
-                                {deletingId === carton.id ? (
-                                  "Deleting..."
-                                ) : (
-                                  <span className="flex items-center gap-1">
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                  <span>{carton.goods?.nameCn ?? "—"}</span>
+                                </div>
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                {carton.trackingNo ?? "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                {carton.packNo ?? "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                {carton.unitPcs ?? "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                {carton.weightKg ?? "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                <div className="flex flex-col text-xs text-muted-foreground">
+                                  <span className="text-foreground">
+                                    L: {carton.lengthCm ?? "—"}
                                   </span>
-                                )}
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      )})
+                                  <span>
+                                    W: {carton.widthCm ?? "—"}
+                                  </span>
+                                  <span>
+                                    H: {carton.heightCm ?? "—"}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                {carton.cbm ?? "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                {carton.shippingMark ?? "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                {carton.copyNumber ?? "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                {carton.remarks ?? "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                {carton.notes ?? "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                {carton.childCartons && carton.childCartons.length
+                                  ? carton.childCartons.join(", ")
+                                  : "—"}
+                              </td>
+                              <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
+                                {new Date(carton.createdAt).toLocaleString()}
+                              </td>
+                              <td className="border border-border px-3 py-2">
+                                <div className="flex flex-wrap justify-center gap-2">
+                                  <Button
+                                    asChild
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 px-2 text-xs"
+                                  >
+                                    <Link href={`/warehouse/china/cartoon/create?cartonId=${carton.id}`}>
+                                      <span className="flex items-center gap-1">
+                                        <Pencil className="h-3.5 w-3.5" />
+                                        Edit
+                                      </span>
+                                    </Link>
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    className="h-8 px-2 text-xs"
+                                    disabled={deletingId === carton.id}
+                                    onClick={() => handleDelete(carton.id, carton.cartonNo)}
+                                  >
+                                    {deletingId === carton.id ? (
+                                      "Deleting..."
+                                    ) : (
+                                      <span className="flex items-center gap-1">
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </span>
+                                    )}
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )
                     )}
                   </tbody>
                 </table>
@@ -606,8 +646,8 @@ export default function ChinaWarehousePage() {
               onToggleAll={toggleBoxModalAll}
               selectedIds={boxModalSelectedIds}
               selectedCartons={selectedCartons}
-              printedCartonNumber={printedCartonNumber}
-              setPrintedCartonNumber={setPrintedCartonNumber}
+              boxRequestNote={boxRequestNote}
+              setBoxRequestNote={setBoxRequestNote}
               creating={creatingBox}
             />
           ) : null}
@@ -828,8 +868,8 @@ function BoxRequestModal({
   onToggleAll,
   selectedIds,
   selectedCartons,
-  printedCartonNumber,
-  setPrintedCartonNumber,
+  boxRequestNote,
+  setBoxRequestNote,
   creating,
 }: {
   onClose: () => void
@@ -838,8 +878,8 @@ function BoxRequestModal({
   onToggleAll: () => void
   selectedIds: Set<number>
   selectedCartons: Carton[]
-  printedCartonNumber: string
-  setPrintedCartonNumber: (value: string) => void
+  boxRequestNote: string
+  setBoxRequestNote: (value: string) => void
   creating: boolean
 }) {
   const allChecked =
@@ -877,20 +917,7 @@ function BoxRequestModal({
                     onChange={onToggleAll}
                   />
                 </th>
-                <th className="border border-border px-3 py-2 text-left">
-                  Carton # (will update)
-                </th>
-                <th className="border border-border px-3 py-2 text-left">
-                  <div className="flex flex-col gap-2">
-                    <span>Printed Carton # (applies to all)</span>
-                    <Input
-                      value={printedCartonNumber}
-                      onChange={(e) => setPrintedCartonNumber(e.target.value)}
-                      placeholder="NEW-CARTON"
-                      className="h-8"
-                    />
-                  </div>
-                </th>
+                <th className="border border-border px-3 py-2 text-left">Carton #</th>
                 <th className="border border-border px-3 py-2 text-left">Name (EN / CN)</th>
                 <th className="border border-border px-3 py-2 text-left">Tracking #</th>
                 <th className="border border-border px-3 py-2 text-left">Unit pcs</th>
@@ -899,9 +926,9 @@ function BoxRequestModal({
                 <th className="border border-border px-3 py-2 text-left">Status</th>
               </tr>
             </thead>
-              <tbody>
-                {selectedCartons.map((carton) => (
-                  <tr key={carton.id} className="bg-card">
+            <tbody>
+              {selectedCartons.map((carton) => (
+                <tr key={carton.id} className="bg-card">
                     <td className="border border-border px-3 py-2">
                       <input
                       type="checkbox"
@@ -912,10 +939,7 @@ function BoxRequestModal({
                     />
                   </td>
                   <td className="border border-border px-3 py-2 font-semibold text-foreground">
-                    {printedCartonNumber || carton.cartonNo}
-                  </td>
-                  <td className="border border-border px-3 py-2">
-                    {printedCartonNumber || "—"}
+                    {carton.cartonNo}
                   </td>
                   <td className="border border-border px-3 py-2">
                     <div className="flex flex-col text-xs text-muted-foreground">
@@ -944,6 +968,15 @@ function BoxRequestModal({
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          <label className="text-xs font-semibold text-muted-foreground">Notes</label>
+          <Input
+            value={boxRequestNote}
+            onChange={(e) => setBoxRequestNote(e.target.value)}
+            placeholder="Add instructions for box request"
+          />
         </div>
 
         <div className="mt-4 flex items-center justify-end gap-2">

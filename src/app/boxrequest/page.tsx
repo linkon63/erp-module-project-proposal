@@ -33,11 +33,10 @@ export default function BoxRequestPage() {
   const [requests, setRequests] = useState<BoxRequest[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [savingId, setSavingId] = useState<number | null>(null)
-  const [formState, setFormState] = useState<Record<
-    number,
-    { printedCartonNo: string; notes: string }
-  >>({})
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkCartonNo, setBulkCartonNo] = useState("")
+  const [bulkNotes, setBulkNotes] = useState("")
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -47,14 +46,6 @@ export default function BoxRequestPage() {
         if (!res.ok) throw new Error("Failed to load box requests")
         const data = (await res.json()) as { requests: BoxRequest[] }
         setRequests(data.requests ?? [])
-        const initial: Record<number, { printedCartonNo: string; notes: string }> = {}
-        data.requests?.forEach((r) => {
-          initial[r.id] = {
-            printedCartonNo: r.printedCartonNo ?? "",
-            notes: r.notes ?? "",
-          }
-        })
-        setFormState(initial)
       } catch (err) {
         console.error(err)
         setError("Unable to load box requests.")
@@ -65,45 +56,68 @@ export default function BoxRequestPage() {
     load()
   }, [])
 
-  const handleAccept = async (request: BoxRequest) => {
-    const payload = formState[request.id] ?? { printedCartonNo: "", notes: "" }
-    if (!payload.printedCartonNo.trim()) {
+  const toggleOne = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    if (requests.length === 0) return
+    const allIds = requests.map((r) => r.id)
+    const allSelected = allIds.every((id) => selectedIds.has(id))
+    setSelectedIds(new Set(allSelected ? [] : allIds))
+  }
+
+  const handleAcceptSelected = async () => {
+    if (selectedIds.size === 0) {
+      setError("Select at least one request to accept.")
+      return
+    }
+    if (!bulkCartonNo.trim()) {
       setError("Printed Carton # is required.")
       return
     }
     try {
-      setSavingId(request.id)
+      setSaving(true)
       setError(null)
-      const res = await fetch(`/api/box-requests?id=${request.id}`, {
+      const res = await fetch("/api/box-requests", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          printedCartonNo: payload.printedCartonNo.trim(),
-          notes: payload.notes.trim() || undefined,
+          requestIds: Array.from(selectedIds),
+          printedCartonNo: bulkCartonNo.trim(),
+          notes: bulkNotes.trim() || undefined,
         }),
       })
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null
-        throw new Error(body?.error ?? "Unable to approve request")
+        throw new Error(body?.error ?? "Unable to approve requests")
       }
       setRequests((prev) =>
         prev.map((r) =>
-          r.id === request.id
+          selectedIds.has(r.id)
             ? {
                 ...r,
                 status: "APPROVED",
-                printedCartonNo: payload.printedCartonNo.trim(),
-                notes: payload.notes,
-                carton: { ...r.carton, cartonNo: payload.printedCartonNo.trim() },
+                printedCartonNo: bulkCartonNo.trim(),
+                notes: bulkNotes,
+                carton: { ...r.carton, cartonNo: bulkCartonNo.trim() },
               }
             : r
         )
       )
+      setSelectedIds(new Set())
+      setBulkCartonNo("")
+      setBulkNotes("")
     } catch (err) {
       console.error(err)
-      setError(err instanceof Error ? err.message : "Unable to approve request.")
+      setError(err instanceof Error ? err.message : "Unable to approve requests.")
     } finally {
-      setSavingId(null)
+      setSaving(false)
     }
   }
 
@@ -118,6 +132,35 @@ export default function BoxRequestPage() {
               </p>
               <h1 className="text-2xl font-semibold tracking-tight">Manage box requests</h1>
             </div>
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Printed Carton #
+                </label>
+                <Input
+                  value={bulkCartonNo}
+                  onChange={(e) => setBulkCartonNo(e.target.value)}
+                  placeholder="NEW-CARTON"
+                  className="h-9 min-w-[180px]"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-semibold text-muted-foreground">Notes</label>
+                <Input
+                  value={bulkNotes}
+                  onChange={(e) => setBulkNotes(e.target.value)}
+                  placeholder="Notes for warehouse"
+                  className="h-9 min-w-[220px]"
+                />
+              </div>
+              <Button
+                size="sm"
+                onClick={handleAcceptSelected}
+                disabled={saving || selectedIds.size === 0}
+              >
+                {saving ? "Saving..." : "Accept selected"}
+              </Button>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
@@ -125,6 +168,18 @@ export default function BoxRequestPage() {
               <table className="w-full min-w-[1250px] border-collapse text-sm">
                 <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
+                    <th className="border border-border px-3 py-2 text-left">
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4"
+                        aria-label="Select all requests"
+                        checked={
+                          requests.length > 0 &&
+                          requests.every((r) => selectedIds.has(r.id))
+                        }
+                        onChange={toggleAll}
+                      />
+                    </th>
                     <th className="border border-border px-3 py-2 text-left">Carton #</th>
                     <th className="border border-border px-3 py-2 text-left">Written #</th>
                     <th className="border border-border px-3 py-2 text-left">Name (EN / CN)</th>
@@ -138,37 +193,45 @@ export default function BoxRequestPage() {
                     <th className="border border-border px-3 py-2 text-left">Printed Carton #</th>
                     <th className="border border-border px-3 py-2 text-left">Notes</th>
                     <th className="border border-border px-3 py-2 text-left">Status</th>
-                    <th className="border border-border px-3 py-2 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={14} className="border border-border px-3 py-4 text-center text-muted-foreground">
+                      <td colSpan={13} className="border border-border px-3 py-4 text-center text-muted-foreground">
                         Loading...
                       </td>
                     </tr>
                   ) : error ? (
                     <tr>
-                      <td colSpan={14} className="border border-border px-3 py-4 text-center text-destructive">
+                      <td colSpan={13} className="border border-border px-3 py-4 text-center text-destructive">
                         {error}
                       </td>
                     </tr>
                   ) : requests.length === 0 ? (
                     <tr>
-                      <td colSpan={14} className="border border-border px-3 py-4 text-center text-muted-foreground">
+                      <td colSpan={13} className="border border-border px-3 py-4 text-center text-muted-foreground">
                         No box requests yet.
                       </td>
                     </tr>
                   ) : (
                     requests.map((req) => {
-                      const row = formState[req.id] ?? { printedCartonNo: "", notes: "" }
                       const disabled = req.status === "APPROVED"
                       return (
                         <tr
                           key={req.id}
                           className={req.status === "APPROVED" ? "bg-blue-100" : "bg-card"}
                         >
+                          <td className="border border-border px-3 py-2">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={selectedIds.has(req.id)}
+                              onChange={() => toggleOne(req.id)}
+                              aria-label={`Select box request ${req.id}`}
+                              disabled={disabled}
+                            />
+                          </td>
                           <td className="border border-border px-3 py-2 font-semibold text-foreground">
                             {req.carton.cartonNo}
                           </td>
@@ -211,42 +274,13 @@ export default function BoxRequestPage() {
                             {req.carton.shippingMark ?? "—"}
                           </td>
                           <td className="border border-border px-3 py-2">
-                            <Input
-                              value={row.printedCartonNo}
-                              onChange={(e) =>
-                                setFormState((prev) => ({
-                                  ...prev,
-                                  [req.id]: { ...row, printedCartonNo: e.target.value },
-                                }))
-                              }
-                              disabled={disabled}
-                              placeholder="NEW-CARTON"
-                            />
+                            {req.printedCartonNo ?? "—"}
                           </td>
                           <td className="border border-border px-3 py-2">
-                            <Input
-                              value={row.notes}
-                              onChange={(e) =>
-                                setFormState((prev) => ({
-                                  ...prev,
-                                  [req.id]: { ...row, notes: e.target.value },
-                                }))
-                              }
-                              disabled={disabled}
-                              placeholder="Notes"
-                            />
+                            {req.notes ?? "—"}
                           </td>
                           <td className="border border-border px-3 py-2 uppercase text-muted-foreground">
                             {req.status}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            <Button
-                              size="sm"
-                              disabled={disabled || savingId === req.id}
-                              onClick={() => handleAccept(req)}
-                            >
-                              {savingId === req.id ? "Saving..." : disabled ? "Approved" : "Accept"}
-                            </Button>
                           </td>
                         </tr>
                       )

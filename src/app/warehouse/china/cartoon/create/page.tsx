@@ -369,10 +369,12 @@ export default function CreateCartonPage() {
                   <tr className="bg-muted/60 text-muted-foreground">
                     <th className="border border-border px-3 py-2 text-left">Time</th>
                     <th className="border border-border px-3 py-2 text-left">
-                      Printed Carton #
-                    </th>
-                    <th className="border border-border px-3 py-2 text-left">
-                      Written carton #
+                      <div className="flex flex-col gap-1">
+                        <span>Carton numbers</span>
+                        <span className="text-[11px] font-normal text-muted-foreground">
+                          Printed / Written (combined)
+                        </span>
+                      </div>
                     </th>
                     <th className="border border-border px-3 py-2 text-left">
                       Tracking #
@@ -403,23 +405,23 @@ export default function CreateCartonPage() {
                       {timestamp.toLocaleString()}
                     </td>
                     <td className="border border-border px-2 py-2">
-                      <Input
-                        required
-                        value={form.cartonNo}
-                        onChange={(e) => setForm({ ...form, cartonNo: e.target.value })}
-                        placeholder="CN-001"
-                        className="h-9"
-                      />
-                    </td>
-                    <td className="border border-border px-2 py-2">
-                      <Input
-                        value={form.writtenCartonNo}
-                        onChange={(e) =>
-                          setForm({ ...form, writtenCartonNo: e.target.value })
-                        }
-                        placeholder="WCN-001"
-                        className="h-9"
-                      />
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <Input
+                          required
+                          value={form.cartonNo}
+                          onChange={(e) => setForm({ ...form, cartonNo: e.target.value })}
+                          placeholder="Printed #"
+                          className="h-9"
+                        />
+                        <Input
+                          value={form.writtenCartonNo}
+                          onChange={(e) =>
+                            setForm({ ...form, writtenCartonNo: e.target.value })
+                          }
+                          placeholder="Written #"
+                          className="h-9"
+                        />
+                      </div>
                     </td>
                     <td className="border border-border px-2 py-2">
                       <Input
@@ -496,7 +498,7 @@ export default function CreateCartonPage() {
                     <td className="border border-border px-3 py-2 text-xs font-semibold text-muted-foreground">
                       Extras
                     </td>
-                    <td className="border border-border px-2 py-2" colSpan={3}>
+                    <td className="border border-border px-2 py-2" colSpan={2}>
                       <div className="grid gap-2 sm:grid-cols-3">
                         <Input
                           inputMode="decimal"

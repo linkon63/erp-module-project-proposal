@@ -136,7 +136,8 @@ async function main() {
   await Promise.all(
     cartonSeeds.map((carton) =>
       prisma.carton.upsert({
-        where: { cartonNo: carton.cartonNo },
+        // Use unique trackingNo now that cartonNo is no longer unique
+        where: { trackingNo: carton.trackingNo },
         update: {},
         create: carton,
       })
@@ -146,7 +147,7 @@ async function main() {
   // Combined carton example
   const comboChildNos = ["CN-017", "CN-018"]
   await prisma.carton.upsert({
-    where: { cartonNo: "CN-COMBO-01" },
+    where: { trackingNo: "TRACK-COMBO-01" },
     update: {},
     create: {
       cartonNo: "CN-COMBO-01",
