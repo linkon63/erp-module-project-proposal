@@ -38,6 +38,10 @@ export default function BoxRequestPage() {
   const [bulkNotes, setBulkNotes] = useState("")
   const [saving, setSaving] = useState(false)
 
+  const hasApprovedSelection = requests.some(
+    (req) => selectedIds.has(req.id) && req.status === "APPROVED"
+  )
+
   useEffect(() => {
     async function load() {
       try {
@@ -156,7 +160,7 @@ export default function BoxRequestPage() {
               <Button
                 size="sm"
                 onClick={handleAcceptSelected}
-                disabled={saving || selectedIds.size === 0}
+                disabled={saving || selectedIds.size === 0 || hasApprovedSelection}
               >
                 {saving ? "Saving..." : "Accept selected"}
               </Button>
@@ -169,7 +173,8 @@ export default function BoxRequestPage() {
                 <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="border border-border px-3 py-2 text-left">
-                      <input
+                      Check
+                      {/* <input
                         type="checkbox"
                         className="h-4 w-4"
                         aria-label="Select all requests"
@@ -178,7 +183,7 @@ export default function BoxRequestPage() {
                           requests.every((r) => selectedIds.has(r.id))
                         }
                         onChange={toggleAll}
-                      />
+                      /> */}
                     </th>
                     <th className="border border-border px-3 py-2 text-left">Carton #</th>
                     <th className="border border-border px-3 py-2 text-left">Written #</th>
@@ -223,14 +228,17 @@ export default function BoxRequestPage() {
                           className={req.status === "APPROVED" ? "bg-blue-100" : "bg-card"}
                         >
                           <td className="border border-border px-3 py-2">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={selectedIds.has(req.id)}
-                              onChange={() => toggleOne(req.id)}
-                              aria-label={`Select box request ${req.id}`}
-                              disabled={disabled}
-                            />
+                            {disabled ? (
+                              <span className="text-xs uppercase text-muted-foreground">—</span>
+                            ) : (
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={selectedIds.has(req.id)}
+                                onChange={() => toggleOne(req.id)}
+                                aria-label={`Select box request ${req.id}`}
+                              />
+                            )}
                           </td>
                           <td className="border border-border px-3 py-2 font-semibold text-foreground">
                             {req.carton.cartonNo}
