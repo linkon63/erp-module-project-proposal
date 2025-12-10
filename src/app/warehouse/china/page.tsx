@@ -249,7 +249,8 @@ export default function ChinaWarehousePage() {
         if (typeof window !== "undefined") {
           window.alert(message)
         }
-        throw new Error(message)
+        setError(message)
+        return
       }
       const shippedIds = new Set(modalSelectedCartons.map((c) => c.id))
       setCartons((prev) =>

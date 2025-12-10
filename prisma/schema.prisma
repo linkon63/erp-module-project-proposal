@@ -81,6 +81,7 @@ model Shipment {
   plannedShipDate DateTime?
   status          String    @default("PLANNED")
   totalPrice      Float     @default(0)
+  collectedAmount Float     @default(0)
   cartons         String    @default("[]")
 
   createdAt       DateTime  @default(now())

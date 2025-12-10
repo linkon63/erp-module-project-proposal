@@ -12,6 +12,7 @@ type ShipmentPayload = {
   plannedShipDate?: string
   status?: string
   totalPrice?: number
+  collectedAmount?: number
   cartonNos?: string[]
   cartonIds?: number[]
 }
@@ -55,6 +56,7 @@ export async function GET() {
         ...shipment,
         cartons: cartonNos,
         cartonDetails: details,
+        collectedAmount: shipment.collectedAmount,
       }
     }),
   })
@@ -73,6 +75,10 @@ export async function POST(req: Request) {
     const totalPrice = body.totalPrice ?? null
     if (totalPrice !== null && Number.isNaN(Number(totalPrice))) {
       return NextResponse.json({ error: "totalPrice must be a number" }, { status: 400 })
+    }
+    const collectedAmount = body.collectedAmount ?? 0
+    if (Number.isNaN(Number(collectedAmount))) {
+      return NextResponse.json({ error: "collectedAmount must be a number" }, { status: 400 })
     }
 
     let cartonNos: string[] = []
@@ -144,6 +150,7 @@ export async function POST(req: Request) {
           plannedShipDate: plannedShipDate ?? undefined,
           status: body.status ?? "PLANNED",
           totalPrice: totalPrice != null ? Number(totalPrice) : 0,
+          collectedAmount: Number(collectedAmount) || 0,
           cartons: JSON.stringify(shipmentCartonNos),
         },
       })
@@ -176,5 +183,34 @@ export async function POST(req: Request) {
       { error: "Unable to create shipment" },
       { status: 500 }
     )
+  }
+}
+
+export async function PUT(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const idParam = searchParams.get("id")
+    if (!idParam) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 })
+    }
+    const id = Number(idParam)
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "id must be a number" }, { status: 400 })
+    }
+
+    const body = (await req.json()) as { collectedAmount?: number }
+    if (body.collectedAmount === undefined || Number.isNaN(Number(body.collectedAmount))) {
+      return NextResponse.json({ error: "collectedAmount is required and must be a number" }, { status: 400 })
+    }
+
+    const shipment = await prisma.shipment.update({
+      where: { id },
+      data: { collectedAmount: Number(body.collectedAmount) },
+    })
+
+    return NextResponse.json({ shipment })
+  } catch (error) {
+    console.error("Error updating shipment collection", error)
+    return NextResponse.json({ error: "Unable to update shipment collection" }, { status: 500 })
   }
 }
