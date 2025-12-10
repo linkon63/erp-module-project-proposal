@@ -840,9 +840,7 @@ function ShipmentModal({
               <Button variant="ghost" onClick={onClose} disabled={creating}>
                 Cancel
               </Button>
-              <Button variant="outline" onClick={onConfirmBoxRequest} disabled={creating || creatingBox}>
-                {creatingBox ? "Requesting..." : "Request box"}
-              </Button>
+
               <Button onClick={onConfirm} disabled={creating}>
                 {creating ? "Creating..." : "Create"}
               </Button>
