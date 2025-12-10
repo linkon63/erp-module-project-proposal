@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 type Carton = {
   id: number
   cartonNo: string
+  printedCartonNo: string | null
   writtenCartonNo: string | null
   trackingNo: string | null
   packNo: string | null
@@ -26,6 +27,7 @@ type Carton = {
   notes: string | null
   status: string
   createdAt: string
+  childCartons: string[]
   goods: {
     name: string
     nameCn: string | null
@@ -49,6 +51,10 @@ export default function ChinaWarehousePage() {
   )
   const [creatingShipment, setCreatingShipment] = useState(false)
   const [modalSelectedIds, setModalSelectedIds] = useState<Set<number>>(new Set())
+  const [showBoxRequestModal, setShowBoxRequestModal] = useState(false)
+  const [boxModalSelectedIds, setBoxModalSelectedIds] = useState<Set<number>>(new Set())
+  const [printedCartonNumber, setPrintedCartonNumber] = useState("")
+  const [creatingBox, setCreatingBox] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -85,7 +91,11 @@ export default function ChinaWarehousePage() {
   const toggleOne = (id: number) => {
     setSelected((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
   }
@@ -158,6 +168,17 @@ export default function ChinaWarehousePage() {
     setShowShipmentModal(true)
   }
 
+  const openBoxRequestModal = () => {
+    if (selected.size === 0) {
+      setError("Select at least one carton for a box request.")
+      return
+    }
+    setBoxModalSelectedIds(new Set(selected))
+    const first = selectedCartons[0]
+    setPrintedCartonNumber(first?.printedCartonNo ?? first?.cartonNo ?? "")
+    setShowBoxRequestModal(true)
+  }
+
   const handleCreateShipment = async () => {
     if (modalSelectedCartons.length === 0) {
       setError("Select at least one carton before creating a shipment.")
@@ -189,10 +210,137 @@ export default function ChinaWarehousePage() {
     }
   }
 
+  const handleBoxRequest = async () => {
+    if (modalSelectedCartons.length === 0) {
+      setError("Select at least one carton for a box request.")
+      return
+    }
+    const requestPayload = modalSelectedCartons.map((c) => ({
+      cartonId: c.id,
+      printedCartonNo: c.printedCartonNo ?? c.cartonNo,
+    }))
+    try {
+      setCreatingBox(true)
+      setError(null)
+      const res = await fetch("/api/box-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requests: requestPayload }),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? "Unable to create box request")
+      }
+      const ids = new Map(requestPayload.map((r) => [r.cartonId, r.printedCartonNo]))
+      setCartons((prev) =>
+        prev.map((c) =>
+          ids.has(c.id)
+            ? {
+                ...c,
+                cartonNo: ids.get(c.id) ?? c.cartonNo,
+                printedCartonNo: ids.get(c.id) ?? c.printedCartonNo ?? null,
+                status: "BOX_REQUESTED",
+              }
+            : c
+        )
+      )
+      setShowShipmentModal(false)
+      setModalSelectedIds(new Set())
+      setSelected(new Set())
+    } catch (err) {
+      console.error(err)
+      setError(err instanceof Error ? err.message : "Unable to create box request.")
+    } finally {
+      setCreatingBox(false)
+    }
+  }
+
+  const toggleBoxModalOne = (id: number) => {
+    setBoxModalSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleBoxModalAll = () => {
+    const allIds = selectedCartons.map((c) => c.id)
+    const allSelected =
+      allIds.length > 0 && allIds.every((id) => boxModalSelectedIds.has(id))
+    if (allSelected) {
+      setBoxModalSelectedIds(new Set())
+    } else {
+      setBoxModalSelectedIds(new Set(allIds))
+    }
+  }
+
+  const handleSubmitBoxRequest = async () => {
+    const ids = Array.from(boxModalSelectedIds)
+    if (!ids.length) {
+      setError("Select at least one carton for a box request.")
+      return
+    }
+
+    const trimmedPrinted = printedCartonNumber.trim()
+    if (!trimmedPrinted) {
+      setError("Enter a printed carton # for the selected cartons.")
+      return
+    }
+
+    const requestPayload = ids.map((id) => ({
+      cartonId: id,
+      printedCartonNo: trimmedPrinted,
+    }))
+
+    try {
+      setCreatingBox(true)
+      setError(null)
+      const res = await fetch("/api/box-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requests: requestPayload }),
+      })
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? "Unable to create box request")
+      }
+      const lookup = new Map(requestPayload.map((r) => [r.cartonId, r.printedCartonNo]))
+      setCartons((prev) =>
+        prev.map((c) =>
+          lookup.has(c.id)
+            ? {
+                ...c,
+                cartonNo: lookup.get(c.id) ?? c.cartonNo,
+                printedCartonNo: lookup.get(c.id) ?? c.printedCartonNo ?? null,
+                status: "BOX_REQUESTED",
+              }
+            : c
+        )
+      )
+      setSelected(new Set())
+      setBoxModalSelectedIds(new Set())
+      setPrintedCartonNumber("")
+      setShowBoxRequestModal(false)
+    } catch (err) {
+      console.error(err)
+      setError(err instanceof Error ? err.message : "Unable to create box request.")
+    } finally {
+      setCreatingBox(false)
+    }
+  }
+
   const toggleModalOne = (id: number) => {
     setModalSelectedIds((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
   }
@@ -206,19 +354,6 @@ export default function ChinaWarehousePage() {
     } else {
       setModalSelectedIds(new Set(allIds))
     }
-  }
-
-  const handleBoxRequest = () => {
-    if (modalSelectedCartons.length === 0) {
-      setError("Select at least one carton for a box request.")
-      return
-    }
-    if (typeof window !== "undefined") {
-      window.alert(
-        `Box request submitted for ${modalSelectedCartons.length} carton(s). (Integrate with box request API here.)`
-      )
-    }
-    setShowShipmentModal(false)
   }
 
   return (
@@ -243,8 +378,18 @@ export default function ChinaWarehousePage() {
                   <Button size="sm" variant="secondary" onClick={openShipmentModal}>
                     Create shipment
                   </Button>
-                  <Button size="sm" variant="outline">
-                    Make a box request
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={openBoxRequestModal}
+                    className="relative"
+                  >
+                    Box Requests
+                    {selected.size > 0 ? (
+                      <span className="absolute -right-2 -top-2 min-w-[1.5rem] rounded-full bg-primary px-2 py-0.5 text-center text-[10px] font-semibold leading-none text-primary-foreground">
+                        {selected.size}
+                      </span>
+                    ) : null}
                   </Button>
                 </div>
               </div>
@@ -287,6 +432,7 @@ export default function ChinaWarehousePage() {
                       <th className="border border-border px-3 py-2 text-left">Copy #</th>
                       <th className="border border-border px-3 py-2 text-left">Remarks</th>
                       <th className="border border-border px-3 py-2 text-left">Notes</th>
+                      <th className="border border-border px-3 py-2 text-left">Child cartons</th>
                       <th className="border border-border px-3 py-2 text-left">Created</th>
                       <th className="border border-border px-3 py-2 text-left">Actions</th>
                     </tr>
@@ -294,25 +440,30 @@ export default function ChinaWarehousePage() {
                   <tbody className="[&_td]:align-middle">
                     {loading ? (
                       <tr>
-                        <td colSpan={16} className="border border-border px-3 py-4 text-center text-sm text-muted-foreground">
-                          Loading cartons...
-                        </td>
-                      </tr>
-                    ) : error ? (
-                      <tr>
-                        <td colSpan={16} className="border border-border px-3 py-4 text-center text-sm text-destructive">
-                          {error}
-                        </td>
-                      </tr>
-                    ) : display.length === 0 ? (
-                      <tr>
-                        <td colSpan={16} className="border border-border px-3 py-4 text-center text-sm text-muted-foreground">
-                          No cartons found.
-                        </td>
+                      <td colSpan={17} className="border border-border px-3 py-4 text-center text-sm text-muted-foreground">
+                        Loading cartons...
+                      </td>
+                    </tr>
+                  ) : error ? (
+                    <tr>
+                      <td colSpan={17} className="border border-border px-3 py-4 text-center text-sm text-destructive">
+                        {error}
+                      </td>
+                    </tr>
+                  ) : display.length === 0 ? (
+                    <tr>
+                      <td colSpan={17} className="border border-border px-3 py-4 text-center text-sm text-muted-foreground">
+                        No cartons found.
+                      </td>
                       </tr>
                     ) : (
-                      display.map((carton) => (
-                        <tr key={carton.id} className="bg-card hover:bg-muted/30">
+                      display.map((carton) => {
+                        const requested = carton.status?.toUpperCase().startsWith("BOX")
+                        const rowClasses = requested
+                          ? "bg-blue-100 hover:bg-blue-200"
+                          : "bg-card hover:bg-muted/30"
+                        return (
+                        <tr key={carton.id} className={rowClasses}>
                           <td className="border border-border px-3 py-2">
                             <input
                               type="checkbox"
@@ -376,6 +527,11 @@ export default function ChinaWarehousePage() {
                           <td className="border border-border px-3 py-2">
                             {carton.notes ?? "—"}
                           </td>
+                          <td className="border border-border px-3 py-2">
+                            {carton.childCartons && carton.childCartons.length
+                              ? carton.childCartons.join(", ")
+                              : "—"}
+                          </td>
                           <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
                             {new Date(carton.createdAt).toLocaleString()}
                           </td>
@@ -412,7 +568,7 @@ export default function ChinaWarehousePage() {
                             </div>
                           </td>
                         </tr>
-                      ))
+                      )})
                     )}
                   </tbody>
                 </table>
@@ -427,6 +583,7 @@ export default function ChinaWarehousePage() {
               onToggleOne={toggleModalOne}
               onToggleAll={toggleModalAll}
               onConfirmBoxRequest={handleBoxRequest}
+              creatingBox={creatingBox}
               modalSelectedIds={modalSelectedIds}
               modalSelectableIds={selectedCartons.map((c) => c.id)}
               selectedCartons={selectedCartons}
@@ -438,6 +595,20 @@ export default function ChinaWarehousePage() {
               setShipmentNo={setShipmentNo}
               estimatedPrice={estimatedPrice}
               creating={creatingShipment}
+            />
+          ) : null}
+
+          {showBoxRequestModal ? (
+            <BoxRequestModal
+              onClose={() => setShowBoxRequestModal(false)}
+              onSubmit={handleSubmitBoxRequest}
+              onToggleOne={toggleBoxModalOne}
+              onToggleAll={toggleBoxModalAll}
+              selectedIds={boxModalSelectedIds}
+              selectedCartons={selectedCartons}
+              printedCartonNumber={printedCartonNumber}
+              setPrintedCartonNumber={setPrintedCartonNumber}
+              creating={creatingBox}
             />
           ) : null}
         </>
@@ -452,6 +623,7 @@ function ShipmentModal({
   onToggleOne,
   onToggleAll,
   onConfirmBoxRequest,
+  creatingBox,
   modalSelectedIds,
   modalSelectableIds,
   selectedCartons,
@@ -469,6 +641,7 @@ function ShipmentModal({
   onToggleOne: (id: number) => void
   onToggleAll: () => void
   onConfirmBoxRequest: () => void
+  creatingBox: boolean
   modalSelectedIds: Set<number>
   modalSelectableIds: number[]
   selectedCartons: Carton[]
@@ -634,14 +807,152 @@ function ShipmentModal({
               <Button variant="ghost" onClick={onClose} disabled={creating}>
                 Cancel
               </Button>
-              <Button variant="outline" onClick={onConfirmBoxRequest} disabled={creating}>
-                Request box
+              <Button variant="outline" onClick={onConfirmBoxRequest} disabled={creating || creatingBox}>
+                {creatingBox ? "Requesting..." : "Request box"}
               </Button>
               <Button onClick={onConfirm} disabled={creating}>
                 {creating ? "Creating..." : "Create"}
               </Button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BoxRequestModal({
+  onClose,
+  onSubmit,
+  onToggleOne,
+  onToggleAll,
+  selectedIds,
+  selectedCartons,
+  printedCartonNumber,
+  setPrintedCartonNumber,
+  creating,
+}: {
+  onClose: () => void
+  onSubmit: () => void
+  onToggleOne: (id: number) => void
+  onToggleAll: () => void
+  selectedIds: Set<number>
+  selectedCartons: Carton[]
+  printedCartonNumber: string
+  setPrintedCartonNumber: (value: string) => void
+  creating: boolean
+}) {
+  const allChecked =
+    selectedCartons.length > 0 &&
+    selectedCartons.every((carton) => selectedIds.has(carton.id))
+
+  return (
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="w-full max-w-5xl rounded-2xl border border-border bg-card p-6 shadow-xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Box request
+            </p>
+            <h2 className="text-xl font-semibold">Confirm cartons for printing</h2>
+            <p className="text-sm text-muted-foreground">
+              {selectedIds.size} carton(s) selected
+            </p>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose} disabled={creating}>
+            Cancel
+          </Button>
+        </div>
+
+        <div className="mt-4 overflow-auto rounded-xl border border-border">
+          <table className="w-full min-w-[1100px] border-collapse text-sm">
+            <thead className="bg-muted/40 text-muted-foreground">
+              <tr>
+                <th className="border border-border px-3 py-2 text-left">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    aria-label="Select all cartons for box request"
+                    checked={allChecked}
+                    onChange={onToggleAll}
+                  />
+                </th>
+                <th className="border border-border px-3 py-2 text-left">
+                  Carton # (will update)
+                </th>
+                <th className="border border-border px-3 py-2 text-left">
+                  <div className="flex flex-col gap-2">
+                    <span>Printed Carton # (applies to all)</span>
+                    <Input
+                      value={printedCartonNumber}
+                      onChange={(e) => setPrintedCartonNumber(e.target.value)}
+                      placeholder="NEW-CARTON"
+                      className="h-8"
+                    />
+                  </div>
+                </th>
+                <th className="border border-border px-3 py-2 text-left">Name (EN / CN)</th>
+                <th className="border border-border px-3 py-2 text-left">Tracking #</th>
+                <th className="border border-border px-3 py-2 text-left">Unit pcs</th>
+                <th className="border border-border px-3 py-2 text-left">Weight (kg)</th>
+                <th className="border border-border px-3 py-2 text-left">CBM</th>
+                <th className="border border-border px-3 py-2 text-left">Status</th>
+              </tr>
+            </thead>
+              <tbody>
+                {selectedCartons.map((carton) => (
+                  <tr key={carton.id} className="bg-card">
+                    <td className="border border-border px-3 py-2">
+                      <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={selectedIds.has(carton.id)}
+                      onChange={() => onToggleOne(carton.id)}
+                      aria-label={`Select carton ${carton.cartonNo} for box request`}
+                    />
+                  </td>
+                  <td className="border border-border px-3 py-2 font-semibold text-foreground">
+                    {printedCartonNumber || carton.cartonNo}
+                  </td>
+                  <td className="border border-border px-3 py-2">
+                    {printedCartonNumber || "—"}
+                  </td>
+                  <td className="border border-border px-3 py-2">
+                    <div className="flex flex-col text-xs text-muted-foreground">
+                      <span className="text-sm font-medium text-foreground">
+                        {carton.goods?.name ?? "—"}
+                      </span>
+                      <span>{carton.goods?.nameCn ?? "—"}</span>
+                    </div>
+                  </td>
+                  <td className="border border-border px-3 py-2">
+                    {carton.trackingNo ?? "—"}
+                  </td>
+                  <td className="border border-border px-3 py-2">
+                    {carton.unitPcs ?? "—"}
+                  </td>
+                  <td className="border border-border px-3 py-2">
+                    {carton.weightKg ?? "—"}
+                  </td>
+                  <td className="border border-border px-3 py-2">
+                    {carton.cbm ?? "—"}
+                  </td>
+                  <td className="border border-border px-3 py-2 uppercase text-muted-foreground">
+                    {carton.status}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <Button variant="ghost" onClick={onClose} disabled={creating}>
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} disabled={creating || selectedIds.size === 0}>
+            {creating ? "Requesting..." : "Request box"}
+          </Button>
         </div>
       </div>
     </div>

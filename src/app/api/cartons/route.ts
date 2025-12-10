@@ -148,6 +148,7 @@ export async function POST(req: Request) {
     const created = await prisma.carton.create({
       data: {
         cartonNo,
+        printedCartonNo: cartonNo,
         writtenCartonNo: body.writtenCartonNo?.trim(),
         trackingNo: body.trackingNo?.trim(),
         goodsId,
@@ -288,6 +289,7 @@ export async function PUT(req: Request) {
       where: { id },
       data: {
         cartonNo,
+        printedCartonNo: cartonNo,
         writtenCartonNo: body.writtenCartonNo?.trim() ?? null,
         trackingNo: body.trackingNo?.trim() ?? null,
         goodsId,

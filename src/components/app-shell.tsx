@@ -90,7 +90,7 @@ const NAV_ITEMS: NavItem[] = [
       },
     ],
   },
-  { label: "Box Request", value: "Box Request", icon: Boxes },
+  { label: "Box Request", value: "Box Request", icon: Boxes, href: "/boxrequest" },
   { label: "Reports", value: "Reports", icon: FileBarChart },
   { label: "ACL", value: "ACL", icon: ShieldCheck },
   { label: "Logout", value: "Logout", icon: LogOut },

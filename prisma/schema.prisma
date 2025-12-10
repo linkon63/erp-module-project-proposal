@@ -35,9 +35,9 @@ model Goods {
 
 model Carton {
   id               Int       @id @default(autoincrement())
-  cartonNo         String    @unique
-  writtenCartonNo  String?
-  trackingNo       String?
+  cartonNo         String    
+  writtenCartonNo  String    @unique
+  trackingNo       String    @unique
 
   goodsId          Int
   goods            Goods     @relation(fields: [goodsId], references: [id])
@@ -65,9 +65,12 @@ model Carton {
 
   isCombinedCarton Boolean    @default(false)
   childCartons     String    @default("[]")
+  printedCartonNo  String?
 
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
+
+  boxRequests      BoxRequest[]
 }
 
 model Shipment {
@@ -90,4 +93,15 @@ model User {
   role     String
   location String
   status   String
+}
+
+model BoxRequest {
+  id                Int      @id @default(autoincrement())
+  cartonId          Int
+  carton            Carton   @relation(fields: [cartonId], references: [id])
+  printedCartonNo   String?
+  notes             String?
+  status            String   @default("PENDING")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

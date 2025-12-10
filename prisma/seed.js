@@ -102,105 +102,71 @@ async function main() {
   }
 
   // Cartons
-  const cartons = [
-    {
-      cartonNo: "CN-001",
-      writtenCartonNo: "WCN-001",
-      trackingNo: "TRACK-001",
-      goodsId: goodsRecords["Garments (T-Shirts)"].id,
-      packNo: "PK-01",
-      unitPcs: 120,
-      weightKg: 35.4,
-      lengthCm: 60,
-      widthCm: 40,
-      heightCm: 35,
-      cbm: 0.084,
-      unitPrice: 220,
-      shippingMark: "GM-TSHIRT",
-      warehouseId: chinaWh.id,
-      status: "AT_CHINA_WH",
-    },
-    {
-      cartonNo: "CN-002",
-      writtenCartonNo: "WCN-002",
-      trackingNo: "TRACK-002",
-      goodsId: goodsRecords["Electronics Accessories"].id,
-      packNo: "PK-02",
-      unitPcs: 80,
-      weightKg: 28.1,
-      lengthCm: 55,
-      widthCm: 38,
-      heightCm: 32,
-      cbm: 0.067,
-      unitPrice: 180,
-      shippingMark: "EL-ACC",
-      warehouseId: chinaWh.id,
-      status: "AT_CHINA_WH",
-    },
-    {
-      cartonNo: "CN-003",
-      writtenCartonNo: "WCN-003",
-      trackingNo: "TRACK-003",
-      goodsId: goodsRecords["Electronics Accessories"].id,
-      packNo: "PK-03",
-      unitPcs: 90,
-      weightKg: 29.6,
-      lengthCm: 58,
-      widthCm: 40,
-      heightCm: 34,
-      cbm: 0.079,
-      unitPrice: 195,
-      shippingMark: "EL-ACC",
-      warehouseId: chinaWh.id,
-      status: "AT_CHINA_WH",
-    },
-    {
-      cartonNo: "BD-001",
-      writtenCartonNo: "WBD-001",
-      goodsId: goodsRecords["Footwear"].id,
-      packNo: "PK-04",
-      unitPcs: 150,
-      weightKg: 42.2,
-      lengthCm: 62,
-      widthCm: 42,
-      heightCm: 38,
-      cbm: 0.099,
-      unitPrice: 260,
-      shippingMark: "FT-WEAR",
-      warehouseId: bdWh.id,
-      status: "AT_BD_WH",
-    },
-  ]
+  const cartonSeeds = Array.from({ length: 30 }, (_, idx) => {
+    const n = idx + 1
+    const padded = n.toString().padStart(3, "0")
+    const inChina = n <= 18
+    const goodsKeys = ["Garments (T-Shirts)", "Electronics Accessories", "Footwear"]
+    const goodsKey = goodsKeys[idx % goodsKeys.length]
+    const lengthCm = 55 + (idx % 5) * 2
+    const widthCm = 38 + (idx % 4)
+    const heightCm = 32 + (idx % 3)
+    const cbm = Number(((lengthCm * widthCm * heightCm) / 1000000).toFixed(3))
+    const baseStatus = inChina ? "AT_CHINA_WH" : "AT_BD_WH"
 
-  for (const carton of cartons) {
-    await prisma.carton.upsert({
-      where: { cartonNo: carton.cartonNo },
-      update: {},
-      create: carton,
-    })
-  }
+    return {
+      cartonNo: `${inChina ? "CN" : "BD"}-${padded}`,
+      writtenCartonNo: `${inChina ? "WCN" : "WBD"}-${padded}`,
+      trackingNo: `${inChina ? "TRACK-CN" : "TRACK-BD"}-${padded}`,
+      goodsId: goodsRecords[goodsKey].id,
+      packNo: `PK-${padded}`,
+      unitPcs: 80 + (idx % 5) * 10,
+      weightKg: Number((25 + idx * 0.8).toFixed(1)),
+      lengthCm,
+      widthCm,
+      heightCm,
+      cbm,
+      unitPrice: 150 + idx * 5,
+      shippingMark: goodsRecords[goodsKey].shippingMark,
+      warehouseId: inChina ? chinaWh.id : bdWh.id,
+      status: baseStatus,
+    }
+  })
+
+  await Promise.all(
+    cartonSeeds.map((carton) =>
+      prisma.carton.upsert({
+        where: { cartonNo: carton.cartonNo },
+        update: {},
+        create: carton,
+      })
+    )
+  )
 
   // Combined carton example
+  const comboChildNos = ["CN-017", "CN-018"]
   await prisma.carton.upsert({
     where: { cartonNo: "CN-COMBO-01" },
     update: {},
     create: {
       cartonNo: "CN-COMBO-01",
+      writtenCartonNo: "WCN-COMBO-01",
+      trackingNo: "TRACK-COMBO-01",
       goodsId: goodsRecords["Electronics Accessories"].id,
       packNo: "PK-C1",
       unitPcs: 170,
       weightKg: 58.0,
       cbm: 0.14,
-      shippingMark: "EL-ACC",
+      shippingMark: goodsRecords["Electronics Accessories"].shippingMark,
       warehouseId: chinaWh.id,
       status: "COMBINED",
       isCombinedCarton: true,
-      childCartons: JSON.stringify(["CN-002", "CN-003"]),
+      childCartons: JSON.stringify(comboChildNos),
     },
   })
 
   await prisma.carton.updateMany({
-    where: { cartonNo: { in: ["CN-002", "CN-003"] } },
+    where: { cartonNo: { in: comboChildNos } },
     data: { status: "IN_COMBINED" },
   })
 
