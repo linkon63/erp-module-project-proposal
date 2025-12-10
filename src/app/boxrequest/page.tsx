@@ -70,10 +70,9 @@ export default function BoxRequestPage() {
   }
 
   const toggleAll = () => {
-    if (requests.length === 0) return
-    const allIds = requests.map((r) => r.id)
-    const allSelected = allIds.every((id) => selectedIds.has(id))
-    setSelectedIds(new Set(allSelected ? [] : allIds))
+    if (pendingIds.length === 0) return
+    const allSelected = pendingIds.every((id) => selectedIds.has(id))
+    setSelectedIds(new Set(allSelected ? [] : pendingIds))
   }
 
   const handleAcceptSelected = async () => {
@@ -178,17 +177,6 @@ export default function BoxRequestPage() {
                   <tr>
                     <th className="border border-border px-3 py-2 text-left">
                       -
-                      {/* <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        aria-label="Select all pending requests"
-                        checked={
-                          pendingIds.length > 0 &&
-                          pendingIds.every((id) => selectedIds.has(id))
-                        }
-                        onChange={toggleAll}
-                        disabled={pendingIds.length === 0}
-                      /> */}
                     </th>
                     <th className="border border-border px-3 py-2 text-left">Carton #</th>
                     <th className="border border-border px-3 py-2 text-left">Written #</th>
