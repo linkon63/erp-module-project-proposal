@@ -77,13 +77,13 @@ const NAV_ITEMS: NavItem[] = [
     icon: Ship,
     children: [
       {
-        label: "China Shipment",
+        label: "China Shipment To BD",
         value: "China Shipment",
         icon: PackageSearch,
         href: "/shipments/china",
       },
       {
-        label: "Hongkong Shipment",
+        label: "Hongkong Shipment To BD",
         value: "Hongkong Shipment",
         icon: PackageSearch,
         href: "/shipments/hongkong",

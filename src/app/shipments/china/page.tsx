@@ -1,11 +1,9 @@
 "use client"
 
-import type { FormEvent } from "react"
 import { useEffect, useState } from "react"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 
 type Shipment = {
@@ -16,28 +14,32 @@ type Shipment = {
   plannedShipDate?: string | null
   status: string
   cartons: string[]
+  totalPrice?: number | null
   createdAt?: string
+  cartonDetails?: CartonDetail[]
 }
 
-type FormState = {
-  shipmentNo: string
-  fromWarehouse: string
-  toWarehouse: string
-  plannedShipDate: string
-  cartonNos: string
+type CartonDetail = {
+  id: number
+  cartonNo: string
+  writtenCartonNo: string | null
+  trackingNo: string | null
+  packNo: string | null
+  unitPcs: number | null
+  weightKg: number | null
+  cbm: number | null
+  lengthCm: number | null
+  widthCm: number | null
+  heightCm: number | null
+  shippingMark: string | null
+  status: string
+  goods?: { name: string; nameCn: string | null }
 }
 
 export default function ShipmentsPage() {
   const [shipments, setShipments] = useState<Shipment[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [form, setForm] = useState<FormState>({
-    shipmentNo: "",
-    fromWarehouse: "China Warehouse",
-    toWarehouse: "Bangladesh Warehouse",
-    plannedShipDate: "",
-    cartonNos: "",
-  })
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     async function load() {
@@ -48,7 +50,6 @@ export default function ShipmentsPage() {
         setShipments(data.shipments ?? [])
       } catch (err) {
         console.error(err)
-        setError("Failed to load shipments")
       } finally {
         setLoading(false)
       }
@@ -56,52 +57,6 @@ export default function ShipmentsPage() {
 
     load()
   }, [])
-
-  const handleCreateShipment = async (event: FormEvent) => {
-    event.preventDefault()
-    setError(null)
-
-    const cartons = form.cartonNos
-      .split(",")
-      .map((c) => c.trim())
-      .filter(Boolean)
-
-    if (!cartons.length) {
-      setError("Add at least one carton number")
-      return
-    }
-
-    try {
-      const res = await fetch("/api/shipments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          shipmentNo: form.shipmentNo,
-          fromWarehouse: form.fromWarehouse,
-          toWarehouse: form.toWarehouse,
-          plannedShipDate: form.plannedShipDate,
-          cartonNos: cartons,
-        }),
-      })
-
-      if (!res.ok) {
-        throw new Error("Unable to create shipment")
-      }
-
-      const { shipment } = (await res.json()) as { shipment: Shipment }
-      setShipments((prev) => [shipment, ...prev])
-      setForm({
-        shipmentNo: "",
-        fromWarehouse: "China Warehouse",
-        toWarehouse: "Bangladesh Warehouse",
-        plannedShipDate: "",
-        cartonNos: "",
-      })
-    } catch (err) {
-      console.error(err)
-      setError("Unable to create shipment")
-    }
-  }
 
   return (
     <AppShell wide>
@@ -118,57 +73,7 @@ export default function ShipmentsPage() {
               Capture shipment details and assign cartons selected from the warehouse inventory.
             </p>
           </div>
-
-          <form
-            className="grid gap-4 rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur"
-            onSubmit={handleCreateShipment}
-          >
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input
-              required
-              placeholder="Shipment No *"
-              value={form.shipmentNo}
-              onChange={(e) =>
-                setForm({ ...form, shipmentNo: e.target.value })
-              }
-            />
-            <Input
-              type="date"
-              value={form.plannedShipDate}
-              onChange={(e) =>
-                setForm({ ...form, plannedShipDate: e.target.value })
-              }
-            />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Input
-              placeholder="From warehouse"
-              value={form.fromWarehouse}
-              onChange={(e) =>
-                setForm({ ...form, fromWarehouse: e.target.value })
-              }
-            />
-            <Input
-              placeholder="To warehouse"
-              value={form.toWarehouse}
-              onChange={(e) =>
-                setForm({ ...form, toWarehouse: e.target.value })
-              }
-            />
-          </div>
-          <Input
-            placeholder="Carton numbers (comma-separated)"
-            value={form.cartonNos}
-            onChange={(e) => setForm({ ...form, cartonNos: e.target.value })}
-          />
-          <div className="flex flex-wrap gap-3">
-            <Button type="submit">Create shipment</Button>
-            {error ? (
-              <span className="text-sm text-destructive">{error}</span>
-            ) : null}
-          </div>
-          </form>
-
+          
           <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -213,14 +118,104 @@ export default function ShipmentsPage() {
                         {new Date(shipment.plannedShipDate).toLocaleDateString()}
                       </p>
                     ) : null}
+                    {shipment.totalPrice != null ? (
+                      <p className="text-xs text-muted-foreground">
+                        Total price: {shipment.totalPrice}
+                      </p>
+                    ) : null}
                   </div>
-                  <div className="text-right text-sm text-muted-foreground">
-                    Cartons:{" "}
-                    {shipment.cartons && shipment.cartons.length
-                      ? shipment.cartons.join(", ")
-                      : "—"}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        setExpanded((prev) => {
+                          const next = new Set(prev)
+                          if (next.has(shipment.id)) {
+                            next.delete(shipment.id)
+                          } else {
+                            next.add(shipment.id)
+                          }
+                          return next
+                        })
+                      }
+                    >
+                      {expanded.has(shipment.id) ? "Hide cartons" : "View cartons"}
+                    </Button>
                   </div>
-                </div>
+                  </div>
+                {expanded.has(shipment.id) ? (
+                  <div className="mt-3 rounded-lg border border-dashed border-border/70 bg-muted/20 p-3 text-sm text-muted-foreground">
+                    {shipment.cartonDetails && shipment.cartonDetails.length ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[900px] border-collapse text-xs">
+                          <thead className="bg-muted/40 text-muted-foreground">
+                            <tr>
+                              <th className="border border-border px-2 py-1 text-left">Carton #</th>
+                              <th className="border border-border px-2 py-1 text-left">Written #</th>
+                              <th className="border border-border px-2 py-1 text-left">Name (EN / CN)</th>
+                              <th className="border border-border px-2 py-1 text-left">Tracking #</th>
+                              <th className="border border-border px-2 py-1 text-left">Pack #</th>
+                              <th className="border border-border px-2 py-1 text-left">Unit pcs</th>
+                              <th className="border border-border px-2 py-1 text-left">Weight (kg)</th>
+                              <th className="border border-border px-2 py-1 text-left">Size (L/W/H)</th>
+                              <th className="border border-border px-2 py-1 text-left">CBM</th>
+                              <th className="border border-border px-2 py-1 text-left">Shipping mark</th>
+                              <th className="border border-border px-2 py-1 text-left">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {shipment.cartonDetails.map((c) => (
+                              <tr key={c.id} className="bg-card">
+                                <td className="border border-border px-2 py-1 font-semibold text-foreground">
+                                  {c.cartonNo}
+                                </td>
+                                <td className="border border-border px-2 py-1">
+                                  {c.writtenCartonNo ?? "—"}
+                                </td>
+                                <td className="border border-border px-2 py-1">
+                                  <div className="flex flex-col text-[11px] text-muted-foreground">
+                                    <span className="text-foreground">{c.goods?.name ?? "—"}</span>
+                                    <span>{c.goods?.nameCn ?? "—"}</span>
+                                  </div>
+                                </td>
+                                <td className="border border-border px-2 py-1">{c.trackingNo ?? "—"}</td>
+                                <td className="border border-border px-2 py-1">{c.packNo ?? "—"}</td>
+                                <td className="border border-border px-2 py-1">{c.unitPcs ?? "—"}</td>
+                                <td className="border border-border px-2 py-1">{c.weightKg ?? "—"}</td>
+                                <td className="border border-border px-2 py-1">
+                                  <div className="flex flex-col text-[11px] text-muted-foreground">
+                                    <span className="text-foreground">L: {c.lengthCm ?? "—"}</span>
+                                    <span>W: {c.widthCm ?? "—"}</span>
+                                    <span>H: {c.heightCm ?? "—"}</span>
+                                  </div>
+                                </td>
+                                <td className="border border-border px-2 py-1">{c.cbm ?? "—"}</td>
+                                <td className="border border-border px-2 py-1">{c.shippingMark ?? "—"}</td>
+                                <td className="border border-border px-2 py-1 uppercase text-muted-foreground">
+                                  {c.status}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : shipment.cartons && shipment.cartons.length ? (
+                      <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {shipment.cartons.map((c, idx) => (
+                          <li
+                            key={`${shipment.id}-${c}-${idx}`}
+                            className="rounded-md border border-border/70 bg-card/60 px-3 py-2 text-foreground"
+                          >
+                            {c}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p>No cartons recorded for this shipment.</p>
+                    )}
+                  </div>
+                ) : null}
               </div>
             ))}
             {!shipments.length && !loading ? (

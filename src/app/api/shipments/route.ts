@@ -31,11 +31,32 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   })
 
+  const allCartonNos = shipments
+    .map((s) => parseJsonArray(s.cartons))
+    .flat()
+    .filter(Boolean)
+
+  const cartonDetails = allCartonNos.length
+    ? await prisma.carton.findMany({
+        where: { cartonNo: { in: allCartonNos } },
+        include: { goods: true, warehouse: true },
+      })
+    : []
+
+  const cartonMap = new Map(cartonDetails.map((c) => [c.cartonNo, c]))
+
   return NextResponse.json({
-    shipments: shipments.map((shipment) => ({
-      ...shipment,
-      cartons: parseJsonArray(shipment.cartons),
-    })),
+    shipments: shipments.map((shipment) => {
+      const cartonNos = parseJsonArray(shipment.cartons)
+      const details = cartonNos
+        .map((no) => cartonMap.get(no))
+        .filter(Boolean)
+      return {
+        ...shipment,
+        cartons: cartonNos,
+        cartonDetails: details,
+      }
+    }),
   })
 }
 
