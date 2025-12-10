@@ -266,7 +266,7 @@ export default function ChinaWarehousePage() {
                 ...c,
                 cartonNo: ids.get(c.id) ?? c.cartonNo,
                 printedCartonNo: ids.get(c.id) ?? c.printedCartonNo ?? null,
-                status: "BOX_REQUESTED",
+                status: "BOX_REQUEST_PENDING",
               }
             : c
         )
@@ -329,17 +329,10 @@ export default function ChinaWarehousePage() {
         const body = (await res.json().catch(() => null)) as { error?: string } | null
         throw new Error(body?.error ?? "Unable to create box request")
       }
-      const lookup = new Map(requestPayload.map((r) => [r.cartonId, r.printedCartonNo]))
+      const lookup = new Set(requestPayload.map((r) => r.cartonId))
       setCartons((prev) =>
         prev.map((c) =>
-          lookup.has(c.id)
-            ? {
-                ...c,
-                cartonNo: lookup.get(c.id) ?? c.cartonNo,
-                printedCartonNo: lookup.get(c.id) ?? c.printedCartonNo ?? null,
-                status: "BOX_REQUESTED",
-              }
-            : c
+          lookup.has(c.id) ? { ...c, status: "BOX_REQUEST_PENDING" } : c
         )
       )
       setSelected(new Set())
