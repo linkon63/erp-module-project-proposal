@@ -1,5 +1,11 @@
 # ERP Solutions
 
+In the warehouse page, select cartons → click Box Requests → optionally add a note → submit. Those cartons become BOX_REQUEST_PENDING and disappear from the warehouse list until approved.
+/api/box-requests stores requests as PENDING with the note, no new carton number required when creating.
+On /boxrequest, you see all requests. Enter one Printed Carton # (and optional note), select the requests, and click “Accept selected.”
+Bulk approval calls PUT /api/box-requests, sets requests to APPROVED, updates all selected cartons to the new carton number, and restores them to AT_CHINA_WH.
+After approval, refresh the warehouse page: cartons reappear grouped by their new carton number.
+
 Next.js App Router starter with Tailwind CSS v4 and shadcn/ui ready to scaffold new screens.
 
 ## Getting Started
