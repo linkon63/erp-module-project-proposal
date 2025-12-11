@@ -176,17 +176,7 @@ export default function BoxRequestPage() {
                 <thead className="bg-muted/40 text-muted-foreground">
                   <tr>
                     <th className="border border-border px-3 py-2 text-left">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        aria-label="Select all pending requests"
-                        checked={
-                          pendingIds.length > 0 &&
-                          pendingIds.every((id) => selectedIds.has(id))
-                        }
-                        onChange={toggleAll}
-                        disabled={pendingIds.length === 0}
-                      />
+                      -
                     </th>
                     <th className="border border-border px-3 py-2 text-left">Carton #</th>
                     <th className="border border-border px-3 py-2 text-left">Written #</th>

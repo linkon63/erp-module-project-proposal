@@ -49,6 +49,9 @@ export default function ShipmentsPage() {
   const [cartonCollectInputs, setCartonCollectInputs] = useState<Record<number, string>>({})
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [savingCartonId, setSavingCartonId] = useState<number | null>(null)
+  const [toast, setToast] = useState<{ message: string; type?: "error" | "info" } | null>(
+    null
+  )
 
   useEffect(() => {
     async function load() {
@@ -98,43 +101,50 @@ export default function ShipmentsPage() {
     )
   }
 
+  useEffect(() => {
+    if (!toast) return
+    const timer = setTimeout(() => setToast(null), 2500)
+    return () => clearTimeout(timer)
+  }, [toast])
+
   return (
     <AppShell wide>
       {() => (
-        <div className="flex flex-col gap-8">
-          <div className="flex flex-col gap-3">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-              Shipment Module
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Plan shipments from China to Bangladesh
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              Capture shipment details and assign cartons selected from the warehouse inventory.
-            </p>
-          </div>
-          
-          <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+        <>
+          <div className="flex flex-col gap-8">
+            <div className="flex flex-col gap-3">
               <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                Shipments
+                Shipment Module
               </p>
-              <h2 className="text-xl font-semibold">All planned shipments</h2>
+              <h1 className="text-3xl font-semibold tracking-tight">
+                Plan shipments from China to Bangladesh
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Capture shipment details and assign cartons selected from the warehouse inventory.
+              </p>
             </div>
-            {loading ? (
-              <span className="text-xs text-muted-foreground">Loading…</span>
-            ) : (
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {shipments.length} total
-              </span>
-            )}
-          </div>
+            
+            <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  Shipments
+                </p>
+                <h2 className="text-xl font-semibold">All planned shipments</h2>
+              </div>
+              {loading ? (
+                <span className="text-xs text-muted-foreground">Loading…</span>
+              ) : (
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {shipments.length} total
+                </span>
+              )}
+            </div>
 
-          <Separator className="my-4" />
+            <Separator className="my-4" />
 
-          <div className="space-y-4">
-            {shipments.map((shipment) => {
+            <div className="space-y-4">
+              {shipments.map((shipment) => {
               const collectedFromCartons =
                 shipment.cartonDetails?.reduce(
                   (sum, c) => sum + (c.collectedAmount ?? 0),
@@ -148,11 +158,22 @@ export default function ShipmentsPage() {
               const total = shipment.totalPrice ?? billedFromCartons
               const collectedTotal = Math.max(collectedFromCartons, shipment.collectedAmount ?? 0)
               const due = Math.max((total ?? 0) - collectedTotal, 0)
+              const isShipmentDelivered = shipment.status === "DELIVERED"
+              const allCartonsDelivered =
+                (shipment.cartonDetails?.length ?? 0) > 0 &&
+                shipment.cartonDetails.every((c) => {
+                  const statusUpper = (c.status ?? "").toUpperCase()
+                  return Boolean(c.deliveredAt) || statusUpper === "DELIVERED"
+                })
+              const shipmentComplete = isShipmentDelivered || allCartonsDelivered
+              const cardClasses = shipmentComplete
+                ? "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3"
+                : "rounded-xl border border-border bg-background/60 px-4 py-3"
 
               return (
                 <div
                   key={shipment.id}
-                  className="rounded-xl border border-border bg-background/60 px-4 py-3"
+                  className={cardClasses}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="space-y-1">
@@ -265,8 +286,19 @@ export default function ShipmentsPage() {
                               const deliveredLabel = c.deliveredAt
                                 ? new Date(c.deliveredAt).toLocaleDateString()
                                 : "—"
+                              const statusUpper = (c.status ?? "").toUpperCase()
+                              const isCartonDelivered =
+                                Boolean(c.deliveredAt) || statusUpper === "DELIVERED" || isShipmentDelivered
+                              const rowClass = isCartonDelivered ? "bg-emerald-50" : "bg-card"
+                              const rawInput = cartonCollectInputs[c.id] ?? ""
+                              const parsedAmount = Number(rawInput)
+                              const roundedAmount = Math.round((Number.isNaN(parsedAmount) ? 0 : parsedAmount) * 100) / 100
+                              const exceedsDue = roundedAmount > due && due > 0
+                              const invalidAmount = Number.isNaN(parsedAmount) || roundedAmount <= 0
+                              const disableCollect = isCartonDelivered || savingCartonId === c.id
+                              const isFullyCollected = due <= 0
                               return (
-                                <tr key={c.id} className="bg-card">
+                                <tr key={c.id} className={rowClass}>
                                   <td className="border border-border px-2 py-1 font-semibold text-foreground">
                                     {c.cartonNo}
                                   </td>
@@ -300,84 +332,108 @@ export default function ShipmentsPage() {
                                     {c.status}
                                   </td>
                                   <td className="border border-border px-2 py-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <Input
-                                        value={cartonCollectInputs[c.id] ?? ""}
-                                        onChange={(e) =>
-                                          setCartonCollectInputs((prev) => ({
-                                            ...prev,
-                                            [c.id]: e.target.value,
-                                          }))
-                                        }
-                                        placeholder="Collect"
-                                        className="h-8 w-24"
-                                        inputMode="decimal"
-                                      />
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        disabled={savingCartonId === c.id}
-                                        onClick={async () => {
-                                          const raw = cartonCollectInputs[c.id] ?? ""
-                                          const amount = Number(raw)
-                                          if (Number.isNaN(amount) || amount <= 0) {
-                                            if (typeof window !== "undefined") {
-                                              window.alert("Enter a valid amount for this carton.")
-                                            }
-                                            return
-                                          }
-                                          try {
-                                            setSavingCartonId(c.id)
-                                            const newCollected = collected + amount
-                                            const res = await fetch(`/api/cartons?id=${c.id}`, {
-                                              method: "PATCH",
-                                              headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify({ collectedAmount: newCollected }),
-                                            })
-                                            if (!res.ok) {
-                                              const body = (await res.json().catch(() => null)) as { error?: string } | null
-                                              const msg = body?.error ?? "Unable to record collection."
-                                              if (typeof window !== "undefined") window.alert(msg)
+                                    {isCartonDelivered ? (
+                                      <span className="text-xs font-semibold text-emerald-700">
+                                        Delivered
+                                      </span>
+                                    ) : (
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <Button
+                                          size="sm"
+                                          className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                          disabled={savingCartonId === c.id}
+                                          onClick={async () => {
+                                            if (due > 0) {
+                                              setToast({
+                                                message: "Collect full amount before marking delivered.",
+                                                type: "error",
+                                              })
                                               return
                                             }
-                                            const data = (await res.json()) as { carton: CartonDetail }
-                                            applyCartonUpdate(shipment.id, data.carton)
-                                            setCartonCollectInputs((prev) => ({ ...prev, [c.id]: "" }))
-                                          } finally {
-                                            setSavingCartonId(null)
-                                          }
-                                        }}
-                                      >
-                                        Collect
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        disabled={savingCartonId === c.id || Boolean(c.deliveredAt)}
-                                        onClick={async () => {
-                                          try {
-                                            setSavingCartonId(c.id)
-                                            const res = await fetch(`/api/cartons?id=${c.id}`, {
-                                              method: "PATCH",
-                                              headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify({ delivered: true, status: "DELIVERED" }),
-                                            })
-                                            if (!res.ok) {
-                                              const body = (await res.json().catch(() => null)) as { error?: string } | null
-                                              const msg = body?.error ?? "Unable to mark carton delivered."
-                                              if (typeof window !== "undefined") window.alert(msg)
-                                              return
+                                            try {
+                                              setSavingCartonId(c.id)
+                                              const res = await fetch(`/api/cartons?id=${c.id}`, {
+                                                method: "PATCH",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({ delivered: true, status: "DELIVERED" }),
+                                              })
+                                              if (!res.ok) {
+                                                const body = (await res.json().catch(() => null)) as { error?: string } | null
+                                                const msg = body?.error ?? "Unable to mark carton delivered."
+                                                setToast({ message: msg, type: "error" })
+                                                return
+                                              }
+                                              const data = (await res.json()) as { carton: CartonDetail }
+                                              applyCartonUpdate(shipment.id, data.carton)
+                                            } finally {
+                                              setSavingCartonId(null)
                                             }
-                                            const data = (await res.json()) as { carton: CartonDetail }
-                                            applyCartonUpdate(shipment.id, data.carton)
-                                          } finally {
-                                            setSavingCartonId(null)
-                                          }
-                                        }}
-                                      >
-                                        {c.deliveredAt ? "Delivered" : "Mark delivered"}
-                                      </Button>
-                                    </div>
+                                          }}
+                                        >
+                                          Mark delivered
+                                        </Button>
+                                        {isFullyCollected ? (
+                                          <span className="text-xs font-semibold text-emerald-700">
+                                            Collected
+                                          </span>
+                                        ) : (
+                                          <>
+                                            <Input
+                                              value={rawInput}
+                                              onChange={(e) =>
+                                                setCartonCollectInputs((prev) => ({
+                                                  ...prev,
+                                                  [c.id]: e.target.value,
+                                                }))
+                                              }
+                                              placeholder="Collect"
+                                              className="h-8 w-24"
+                                              inputMode="decimal"
+                                            />
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              disabled={disableCollect}
+                                              onClick={async () => {
+                                                const amount = roundedAmount
+                                                if (Number.isNaN(amount) || amount <= 0 || amount > due) {
+                                                  setToast({
+                                                    message:
+                                                      amount > due
+                                                        ? "Cannot collect more than the billed amount."
+                                                        : "Enter a valid amount for this carton.",
+                                                    type: "error",
+                                                  })
+                                                  return
+                                                }
+                                                try {
+                                                  setSavingCartonId(c.id)
+                                                  const newCollected = collected + amount
+                                                  const res = await fetch(`/api/cartons?id=${c.id}`, {
+                                                    method: "PATCH",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ collectedAmount: newCollected }),
+                                                  })
+                                                  if (!res.ok) {
+                                                    const body = (await res.json().catch(() => null)) as { error?: string } | null
+                                                    const msg = body?.error ?? "Unable to record collection."
+                                                    setToast({ message: msg, type: "error" })
+                                                    return
+                                                  }
+                                                  const data = (await res.json()) as { carton: CartonDetail }
+                                                  applyCartonUpdate(shipment.id, data.carton)
+                                                  setCartonCollectInputs((prev) => ({ ...prev, [c.id]: "" }))
+                                                } finally {
+                                                  setSavingCartonId(null)
+                                                }
+                                              }}
+                                            >
+                                              Collect
+                                            </Button>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
                                   </td>
                                 </tr>
                               )
@@ -412,6 +468,18 @@ export default function ShipmentsPage() {
           </div>
           </div>
         </div>
+        {toast ? (
+          <div className="fixed bottom-4 right-4 z-50 rounded-lg border border-border bg-card px-4 py-3 shadow-lg">
+            <span
+              className={`text-sm font-medium ${
+                toast.type === "error" ? "text-destructive" : "text-foreground"
+              }`}
+            >
+              {toast.message}
+            </span>
+          </div>
+        ) : null}
+        </>
       )}
     </AppShell>
   )
