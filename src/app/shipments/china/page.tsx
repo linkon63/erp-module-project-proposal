@@ -280,11 +280,17 @@ export default function ShipmentsPage() {
                           </thead>
                           <tbody>
                             {shipment.cartonDetails.map((c) => {
-                              const billed = c.billedAmount ?? 0
-                              const collected = c.collectedAmount ?? 0
-                              const due = Math.max(billed - collected, 0)
-                              const displayBilled = Math.round(billed)
-                              const displayDue = Math.round(due)
+                              const billed =
+                                Math.round(((c.billedAmount ?? 0) + Number.EPSILON) * 100) / 100
+                              const collected =
+                                Math.round(((c.collectedAmount ?? 0) + Number.EPSILON) * 100) / 100
+                              const due =
+                                Math.max(
+                                  Math.round(((billed - collected) + Number.EPSILON) * 100) / 100,
+                                  0
+                                )
+                              const displayBilled = billed.toFixed(2)
+                              const displayDue = due.toFixed(2)
                               const deliveredLabel = c.deliveredAt
                                 ? new Date(c.deliveredAt).toLocaleDateString()
                                 : "—"
@@ -327,7 +333,9 @@ export default function ShipmentsPage() {
                                   <td className="border border-border px-2 py-1">{c.cbm ?? "—"}</td>
                                   <td className="border border-border px-2 py-1">{c.shippingMark ?? "—"}</td>
                                   <td className="border border-border px-2 py-1 text-right">{displayBilled}</td>
-                                  <td className="border border-border px-2 py-1 text-right">{collected.toFixed(2)}</td>
+                                  <td className="border border-border px-2 py-1 text-right">
+                                    {collected.toFixed(2)}
+                                  </td>
                                   <td className="border border-border px-2 py-1 text-right">{displayDue}</td>
                                   <td className="border border-border px-2 py-1">{deliveredLabel}</td>
                                   <td className="border border-border px-2 py-1 uppercase text-muted-foreground">
@@ -410,7 +418,9 @@ export default function ShipmentsPage() {
                                                 }
                                                 try {
                                                   setSavingCartonId(c.id)
-                                                  const newCollected = collected + amount
+                                                  const newCollected =
+                                                    Math.round(((collected + amount) + Number.EPSILON) * 100) /
+                                                    100
                                                   const res = await fetch(`/api/cartons?id=${c.id}`, {
                                                     method: "PATCH",
                                                     headers: { "Content-Type": "application/json" },
