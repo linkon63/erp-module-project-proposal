@@ -1,7 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import {
+  cloneElement,
+  isValidElement,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react"
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -385,16 +393,9 @@ export default function Home() {
             </div>
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="space-y-2">
-                <p className="text-[11px] uppercase tracking-[0.25em] text-slate-200">
-                  Owner dashboard
-                </p>
                 <h1 className="text-3xl font-semibold tracking-tight">
                   Business at a glance
                 </h1>
-                <p className="max-w-2xl text-sm text-slate-200/80">
-                  Track cartons, shipments, dues, and requests in one view. Built from the
-                  live carton, shipment, and box-request flows.
-                </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <Link
@@ -905,24 +906,53 @@ function StatCard({
   progress?: number
   loading?: boolean
 }) {
-  const toneMap: Record<Tone, string> = {
-    emerald: "from-emerald-50 via-white to-white border-emerald-200 text-emerald-900",
-    blue: "from-blue-50 via-white to-white border-blue-200 text-blue-900",
-    amber: "from-amber-50 via-white to-white border-amber-200 text-amber-900",
-    violet: "from-violet-50 via-white to-white border-violet-200 text-violet-900",
+  const toneMap: Record<
+    Tone,
+    { card: string; iconBg: string; progress: string }
+  > = {
+    emerald: {
+      card: "from-emerald-600/15 via-emerald-50 to-white border-emerald-200 text-emerald-950",
+      iconBg: "bg-emerald-600/15 text-emerald-800 ring-1 ring-emerald-200",
+      progress: "from-emerald-500 via-emerald-400 to-emerald-500",
+    },
+    blue: {
+      card: "from-blue-600/15 via-blue-50 to-white border-blue-200 text-blue-950",
+      iconBg: "bg-blue-600/15 text-blue-800 ring-1 ring-blue-200",
+      progress: "from-blue-500 via-blue-400 to-blue-500",
+    },
+    amber: {
+      card: "from-amber-500/15 via-amber-50 to-white border-amber-200 text-amber-950",
+      iconBg: "bg-amber-500/20 text-amber-800 ring-1 ring-amber-200",
+      progress: "from-amber-500 via-amber-400 to-amber-500",
+    },
+    violet: {
+      card: "from-violet-600/15 via-violet-50 to-white border-violet-200 text-violet-950",
+      iconBg: "bg-violet-600/15 text-violet-800 ring-1 ring-violet-200",
+      progress: "from-violet-500 via-violet-400 to-violet-500",
+    },
   }
+
+  const ghostIcon =
+    isValidElement(icon) && cloneElement(icon as ReactElement, { className: "size-16 text-black/5" })
+
+  const toneStyles = toneMap[tone]
 
   return (
     <div
-      className={`rounded-2xl border bg-gradient-to-br p-5 shadow-sm ${toneMap[tone]}`}
+      className={`relative overflow-hidden rounded-2xl border bg-gradient-to-br p-5 shadow-sm ${toneStyles.card}`}
     >
+      {ghostIcon ? (
+        <div className="pointer-events-none absolute right-[-8%] top-[-10%] rotate-12">
+          {ghostIcon}
+        </div>
+      ) : null}
       {loading ? (
         <div className="h-16 animate-pulse rounded-lg bg-white/60" />
       ) : (
         <>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="rounded-full bg-white/60 p-2">{icon}</div>
+              <div className={`rounded-full p-2 backdrop-blur ${toneStyles.iconBg}`}>{icon}</div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 {title}
               </p>
@@ -935,7 +965,7 @@ function StatCard({
           {progress !== undefined ? (
             <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/70">
               <div
-                className="h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-500"
+                className={`h-full bg-gradient-to-r ${toneStyles.progress}`}
                 style={{ width: percent(Math.min(Math.max(progress, 0), 1)) }}
               />
             </div>
