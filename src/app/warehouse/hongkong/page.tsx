@@ -1,37 +1,41 @@
 "use client"
 
+import { ClipboardList, PackageSearch, ShieldCheck, Warehouse } from "lucide-react"
+
 import { AppShell } from "@/components/app-shell"
+import { ComingSoon } from "@/components/coming-soon"
 
 export default function HongkongWarehousePage() {
   return (
     <AppShell wide>
       {() => (
-        <div className="mx-auto flex max-w-4xl flex-col items-center justify-center gap-8">
-          <div className="flex flex-col gap-2 text-center">
-            <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
-              Warehouse
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">Hongkong Warehouse</h1>
-            <p className="text-sm text-muted-foreground">
-              Workflows for Hongkong receiving, storage, and outbound to BD will appear here soon.
-            </p>
-          </div>
-
-          <div className="w-full max-w-xl rounded-2xl border border-border bg-card/70 p-8 text-center shadow-sm backdrop-blur">
-            <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <span className="text-xl font-semibold">⏳</span>
-            </div>
-            <div className="mt-4 space-y-2">
-              <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
-                Coming soon
-              </p>
-              <p className="text-lg font-semibold">Hongkong Warehouse</p>
-              <p className="text-sm text-muted-foreground">
-                You will be able to view and manage carton status and preparation for shipments to Bangladesh.
-              </p>
-            </div>
-          </div>
-        </div>
+        <ComingSoon
+          label="Warehouse"
+          title="Hongkong Warehouse"
+          description="We are designing the Hongkong receiving flow with bin locations, QA notes, and smooth handoff to Bangladesh shipments."
+          highlights={[
+            {
+              title: "Inbound and QA",
+              description: "Scan cartons, capture photos, and flag any exceptions before shelving.",
+              icon: ClipboardList,
+            },
+            {
+              title: "Storage map",
+              description: "Reserve racks and aisles so cartons are easy to find when building loads.",
+              icon: Warehouse,
+            },
+            {
+              title: "Prep for Bangladesh",
+              description: "Bundle cartons for outbound and keep packing slips ready for export.",
+              icon: PackageSearch,
+            },
+            {
+              title: "Controls and audit",
+              description: "Simple checklists to keep tallies accurate and give finance a clean handover.",
+              icon: ShieldCheck,
+            },
+          ]}
+        />
       )}
     </AppShell>
   )
