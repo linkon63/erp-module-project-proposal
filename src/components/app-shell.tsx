@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState, type ReactNode } from "react"
+import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
@@ -136,10 +137,17 @@ export function AppShell({ children, wide = false, contentClassName }: AppShellP
       <div className="bg-gradient-to-br from-background via-background to-muted/40 text-foreground w-full">
         <div className="flex min-h-screen w-full">
           <Sidebar collapsible="offcanvas">
-            <SidebarHeader className="border-b border-sidebar-border pb-5">
+            <SidebarHeader className="border-b border-sidebar-border pb-4">
               <div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/60 px-3 py-2">
-                <div className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground font-semibold">
-                  JA
+                <div className="relative h-10 w-10 overflow-hidden rounded-md border border-sidebar-border bg-background">
+                  <Image
+                    src="/logo.jpg"
+                    alt="Jamalpur Associate logo"
+                    fill
+                    sizes="40px"
+                    className="object-contain"
+                    priority
+                  />
                 </div>
                 <div className="flex flex-col">
                   <span className="text-sm font-medium">Jamalpur Associate</span>
