@@ -158,6 +158,28 @@ export default function ShipmentsPage() {
               const total = shipment.totalPrice ?? billedFromCartons
               const collectedTotal = Math.max(collectedFromCartons, shipment.collectedAmount ?? 0)
               const due = Math.max((total ?? 0) - collectedTotal, 0)
+              const formattedTotal = (total ?? 0).toFixed(2)
+              const formattedCollected = collectedTotal.toFixed(2)
+              const formattedDue = due.toFixed(2)
+              const totalCartons =
+                shipment.cartonDetails?.length ??
+                shipment.cartons?.length ??
+                0
+              const deliveredCartons =
+                shipment.cartonDetails?.filter(
+                  (c) => Boolean(c.deliveredAt) || (c.status ?? "").toUpperCase() === "DELIVERED"
+                ).length ?? 0
+              const pendingCartons = Math.max(totalCartons - deliveredCartons, 0)
+              const toggleExpanded = () =>
+                setExpanded((prev) => {
+                  const next = new Set(prev)
+                  if (next.has(shipment.id)) {
+                    next.delete(shipment.id)
+                  } else {
+                    next.add(shipment.id)
+                  }
+                  return next
+                })
               const isShipmentDelivered = shipment.status === "DELIVERED"
               const allCartonsDelivered =
                 (shipment.cartonDetails?.length ?? 0) > 0 &&
@@ -173,7 +195,10 @@ export default function ShipmentsPage() {
               return (
                 <div
                   key={shipment.id}
-                  className={cardClasses}
+                  className={cardClasses + " cursor-pointer"}
+                  role="button"
+                  aria-expanded={expanded.has(shipment.id)}
+                  onClick={toggleExpanded}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="space-y-1">
@@ -183,6 +208,15 @@ export default function ShipmentsPage() {
                         </p>
                         <span className="rounded-full bg-secondary px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-secondary-foreground">
                           {shipment.status}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-800">
+                          Cartons: {totalCartons}
+                        </span>
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                          Delivered: {deliveredCartons}
+                        </span>
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+                          Left: {pendingCartons}
                         </span>
                       </div>
                       <p className="text-sm text-muted-foreground">
@@ -194,9 +228,17 @@ export default function ShipmentsPage() {
                           {new Date(shipment.plannedShipDate).toLocaleDateString()}
                         </p>
                       ) : null}
-                      <p className="text-xs text-muted-foreground">
-                        Total: {total ?? 0} • Collected: {collectedTotal} • Due: {due}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                        <span className="rounded-lg bg-primary/10 px-3 py-1 text-primary">
+                          Total: {formattedTotal}
+                        </span>
+                        <span className="rounded-lg bg-emerald-50 px-3 py-1 text-emerald-700">
+                          Collected: {formattedCollected}
+                        </span>
+                        <span className="rounded-lg bg-amber-50 px-3 py-1 text-amber-700">
+                          Due: {formattedDue}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {/* {shipment.status !== "DELIVERED" ? (
@@ -236,17 +278,10 @@ export default function ShipmentsPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() =>
-                          setExpanded((prev) => {
-                            const next = new Set(prev)
-                            if (next.has(shipment.id)) {
-                              next.delete(shipment.id)
-                            } else {
-                              next.add(shipment.id)
-                            }
-                            return next
-                          })
-                        }
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleExpanded()
+                        }}
                       >
                         {expanded.has(shipment.id) ? "Hide cartons" : "View cartons"}
                       </Button>
