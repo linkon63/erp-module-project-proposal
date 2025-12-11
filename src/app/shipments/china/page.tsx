@@ -1,6 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { Package, PackageCheck, PackageX, Truck, Wallet } from "lucide-react"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
@@ -81,6 +82,7 @@ export default function ShipmentsPage() {
   }, [])
 
   const applyCartonUpdate = (shipmentId: number, updatedCarton: CartonDetail) => {
+    let shouldMarkShipmentDelivered = false
     setShipments((prev) =>
       prev.map((s) => {
         if (s.id !== shipmentId) return s
@@ -96,9 +98,29 @@ export default function ShipmentsPage() {
           0
         )
         const totalPrice = s.totalPrice ?? billedSum
-        return { ...s, cartonDetails: nextDetails, collectedAmount: collectedSum, totalPrice }
+        const allDelivered = nextDetails.length > 0 && nextDetails.every((c) => {
+          const statusUpper = (c.status ?? "").toUpperCase()
+          return Boolean(c.deliveredAt) || statusUpper === "DELIVERED"
+        })
+        if (allDelivered && s.status !== "DELIVERED") {
+          shouldMarkShipmentDelivered = true
+        }
+        return {
+          ...s,
+          status: allDelivered ? "DELIVERED" : s.status,
+          cartonDetails: nextDetails,
+          collectedAmount: collectedSum,
+          totalPrice,
+        }
       })
     )
+    if (shouldMarkShipmentDelivered) {
+      fetch(`/api/shipments?id=${shipmentId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "DELIVERED" }),
+      }).catch((err) => console.error("Failed to mark shipment delivered", err))
+    }
   }
 
   useEffect(() => {
@@ -107,22 +129,129 @@ export default function ShipmentsPage() {
     return () => clearTimeout(timer)
   }, [toast])
 
+  const summary = useMemo(() => {
+    let totalShipments = shipments.length
+    let completedShipments = 0
+    let totalCartons = 0
+    let deliveredCartons = 0
+    let totalAmount = 0
+    let collectedAmount = 0
+
+    shipments.forEach((s) => {
+      if ((s.status ?? "").toUpperCase() === "DELIVERED") completedShipments += 1
+      const cartonCount = s.cartonDetails?.length ?? s.cartons?.length ?? 0
+      totalCartons += cartonCount
+      deliveredCartons +=
+        s.cartonDetails?.filter(
+          (c) => Boolean(c.deliveredAt) || (c.status ?? "").toUpperCase() === "DELIVERED"
+        ).length ?? 0
+
+      const collectedFromDetails =
+        s.cartonDetails?.reduce((sum, c) => sum + (c.collectedAmount ?? 0), 0) ?? 0
+      const billedFromDetails =
+        s.cartonDetails?.reduce((sum, c) => sum + (c.billedAmount ?? 0), 0) ?? 0
+      const total = s.totalPrice ?? billedFromDetails
+      const collected = Math.max(collectedFromDetails, s.collectedAmount ?? 0)
+
+      totalAmount += total ?? 0
+      collectedAmount += collected ?? 0
+    })
+
+    const dueAmount = Math.max(totalAmount - collectedAmount, 0)
+    const pendingCartons = Math.max(totalCartons - deliveredCartons, 0)
+
+    return {
+      totalShipments,
+      completedShipments,
+      totalCartons,
+      deliveredCartons,
+      pendingCartons,
+      totalAmount,
+      collectedAmount,
+      dueAmount,
+    }
+  }, [shipments])
+
   return (
     <AppShell wide>
       {() => (
         <>
           <div className="flex flex-col gap-8">
             <div className="flex flex-col gap-3">
-              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                Shipment Module
-              </p>
-              <h1 className="text-3xl font-semibold tracking-tight">
-                Plan shipments from China to Bangladesh
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Capture shipment details and assign cartons selected from the warehouse inventory.
-              </p>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Plan shipments from China to Bangladesh
+            </h1>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5">
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50/90 p-4 shadow-sm">
+                <div className="rounded-full bg-emerald-100 p-2 text-emerald-700">
+                  <Truck className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-700">
+                    Shipments delivered
+                  </p>
+                  <p className="text-2xl font-semibold text-emerald-900">
+                    {summary.completedShipments} / {summary.totalShipments}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
+                <div className="rounded-full bg-slate-200 p-2 text-slate-800">
+                  <Package className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-slate-700">
+                    Total cartons
+                  </p>
+                  <p className="text-2xl font-semibold text-slate-900">
+                    {summary.totalCartons}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                <div className="rounded-full bg-emerald-100 p-2 text-emerald-800">
+                  <PackageCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-emerald-700">
+                    Delivered cartons
+                  </p>
+                  <p className="text-2xl font-semibold text-emerald-900">
+                    {summary.deliveredCartons}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+                <div className="rounded-full bg-amber-100 p-2 text-amber-800">
+                  <PackageX className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-amber-700">
+                    Undelivered cartons
+                  </p>
+                  <p className="text-2xl font-semibold text-amber-900">
+                    {summary.pendingCartons}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-sm">
+                <div className="rounded-full bg-blue-100 p-2 text-blue-800">
+                  <Wallet className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.2em] text-blue-700">
+                    Collected / Due
+                  </p>
+                  <p className="text-2xl font-semibold text-blue-900">
+                    ৳{summary.collectedAmount.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-blue-700">
+                    Due: ৳{summary.dueAmount.toFixed(2)}
+                  </p>
+                </div>
+              </div>
             </div>
+          </div>
             
             <div className="rounded-2xl border border-border bg-card/70 p-6 shadow-sm backdrop-blur">
             <div className="flex items-center justify-between gap-3">
