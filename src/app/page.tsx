@@ -28,6 +28,7 @@ type Carton = {
   status?: string | null
   weightKg?: number | null
   cbm?: number | null
+  createdAt?: string
   goods?: { name?: string | null; nameCn?: string | null }
 }
 
@@ -124,6 +125,8 @@ export default function Home() {
       rateSamples.length > 0
         ? rateSamples.reduce((sum, r) => sum + r, 0) / rateSamples.length
         : 0
+    const now = Date.now()
+    const dayMs = 1000 * 60 * 60 * 24
 
     const shipmentsEnriched: EnrichedShipment[] = shipments.map((s) => {
       const details = s.cartonDetails ?? []
@@ -203,6 +206,7 @@ export default function Home() {
         } else if (status === "AT_CHINA_WH") {
           acc.chinaReady += 1
           acc.readyWeight += carton.weightKg ?? 0
+          acc.readyCbm += carton.cbm ?? 0
           const billed = carton.billedAmount ?? 0
           const estimated =
             billed > 0 ? billed : (carton.weightKg ?? 0) * averageRatePerKg
@@ -222,9 +226,64 @@ export default function Home() {
         totalWeight: 0,
         totalCbm: 0,
         readyWeight: 0,
+        readyCbm: 0,
         readyEstimatedRevenue: 0,
       }
     )
+
+    const readyAges = cartons
+      .filter((c) => (c.status ?? "").toUpperCase() === "AT_CHINA_WH")
+      .map((c) => {
+        const created = c.createdAt ? new Date(c.createdAt).getTime() : null
+        return created ? (now - created) / dayMs : 0
+      })
+      .filter((d) => d > 0)
+    const readyAging = {
+      avg: readyAges.length
+        ? readyAges.reduce((sum, d) => sum + d, 0) / readyAges.length
+        : 0,
+      max: readyAges.length ? Math.max(...readyAges) : 0,
+      count: readyAges.length,
+    }
+
+    const inTransitAges = shipmentsEnriched
+      .filter((s) => (s.status ?? "").toUpperCase() !== "DELIVERED")
+      .map((s) => (s.createdTs ? (now - s.createdTs) / dayMs : 0))
+      .filter((d) => d > 0)
+    const inTransitAging = {
+      avg: inTransitAges.length
+        ? inTransitAges.reduce((sum, d) => sum + d, 0) / inTransitAges.length
+        : 0,
+      max: inTransitAges.length ? Math.max(...inTransitAges) : 0,
+      count: inTransitAges.length,
+    }
+
+    const cashCollectionRate =
+      shipmentTotals.billed > 0 ? shipmentTotals.collected / shipmentTotals.billed : 1
+
+    const cashTrend = shipmentsEnriched
+      .slice()
+      .sort((a, b) => a.createdTs - b.createdTs)
+      .slice(-6)
+      .map((s) => {
+        const billed = s.billed || 0
+        const collected = s.collected || 0
+        const rate = billed > 0 ? collected / billed : 1
+        return { id: s.id, label: s.shipmentNo, rate }
+      })
+
+    const capacityTargets = { weight: 5000, cbm: 28 }
+    const capacity = {
+      weightReady: pipeline.readyWeight,
+      cbmReady: pipeline.readyCbm,
+      weightFill: capacityTargets.weight
+        ? Math.min(pipeline.readyWeight / capacityTargets.weight, 1)
+        : 0,
+      cbmFill: capacityTargets.cbm
+        ? Math.min(pipeline.readyCbm / capacityTargets.cbm, 1)
+        : 0,
+      targets: capacityTargets,
+    }
 
     const topDueShipments = shipmentsEnriched
       .filter((s) => s.due > 0)
@@ -252,6 +311,47 @@ export default function Home() {
       (r) => (r.status ?? "").toUpperCase() === "APPROVED"
     ).length
 
+    const staleBoxRequests = boxRequests.filter((r) => {
+      const isPending = (r.status ?? "").toUpperCase() === "PENDING"
+      const created = r.createdAt ? new Date(r.createdAt).getTime() : null
+      const ageDays = created ? (now - created) / dayMs : 0
+      return isPending && ageDays >= 2
+    })
+
+    const exceptions = [
+      ...topDueShipments.slice(0, 3).map((s) => ({
+        title: `Due ${currency(s.due)} on ${s.shipmentNo}`,
+        detail: `${s.pendingCartons} cartons left · ${s.fromWarehouse} → ${s.toWarehouse}`,
+        level: "warning" as const,
+      })),
+      ...cartons
+        .filter(
+          (c) =>
+            (c.status ?? "").toUpperCase() === "AT_CHINA_WH" &&
+            c.createdAt &&
+            (now - new Date(c.createdAt).getTime()) / dayMs >= 7
+        )
+        .slice(0, 3)
+        .map((c) => ({
+          title: `Carton ${c.cartonNo} waiting >7 days`,
+          detail: c.goods?.name ? `Goods: ${c.goods.name}` : "Ready but idle",
+          level: "alert" as const,
+        })),
+      ...staleBoxRequests.slice(0, 3).map((r) => ({
+        title: `Box request pending >48h`,
+        detail: `Carton ${r.carton?.cartonNo ?? ""}`,
+        level: "warning" as const,
+      })),
+      ...shipmentsEnriched
+        .filter((s) => (s.ratePerKg ?? 0) <= 0)
+        .slice(0, 2)
+        .map((s) => ({
+          title: `Missing rate for ${s.shipmentNo}`,
+          detail: "Set rate per kg to avoid underbilling",
+          level: "info" as const,
+        })),
+    ]
+
     return {
       shipmentsEnriched,
       shipmentTotals,
@@ -261,6 +361,12 @@ export default function Home() {
       shipmentTrend,
       pendingRequests,
       approvedRequests,
+      readyAging,
+      inTransitAging,
+      cashCollectionRate,
+      cashTrend,
+      capacity,
+      exceptions,
     }
   }, [boxRequests, cartons, shipments])
 
@@ -369,6 +475,101 @@ export default function Home() {
               tone="violet"
               loading={loading}
             />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    Aging / SLA
+                  </p>
+                  <h3 className="text-lg font-semibold">Where we are slow</h3>
+                </div>
+                <AlertTriangle className="size-5 text-amber-500" />
+              </div>
+              <div className="mt-4 grid gap-3 text-sm">
+                <SlaRow
+                  label="Cartons waiting at China WH"
+                  avgDays={dashboard.readyAging.avg}
+                  maxDays={dashboard.readyAging.max}
+                  count={dashboard.readyAging.count}
+                  warnThreshold={7}
+                  dangerThreshold={14}
+                />
+                <SlaRow
+                  label="Shipments still in transit"
+                  avgDays={dashboard.inTransitAging.avg}
+                  maxDays={dashboard.inTransitAging.max}
+                  count={dashboard.inTransitAging.count}
+                  warnThreshold={5}
+                  dangerThreshold={10}
+                />
+                <SlaRow
+                  label="Box requests pending"
+                  avgDays={0}
+                  maxDays={0}
+                  count={dashboard.pendingRequests}
+                  warnThreshold={1}
+                  dangerThreshold={2}
+                  extraHint="Clear requests within 48h"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    Cash health
+                  </p>
+                  <h3 className="text-lg font-semibold">Collections trend</h3>
+                </div>
+                <Wallet className="size-5 text-primary" />
+              </div>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <p>Collection rate</p>
+                  <span className="text-sm font-semibold">
+                    {percent(dashboard.cashCollectionRate)}
+                  </span>
+                </div>
+                <TrendBars trend={dashboard.cashTrend} />
+                <p className="text-xs text-muted-foreground">
+                  Shows last 6 shipments collected vs billed. Aim to keep bars near 100%.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-border bg-card/80 p-5 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                    Capacity vs load
+                  </p>
+                  <h3 className="text-lg font-semibold">Ready to fill</h3>
+                </div>
+                <Truck className="size-5 text-blue-600" />
+              </div>
+              <div className="mt-4 space-y-3 text-sm">
+                <CapacityRow
+                  label="Weight"
+                  ready={dashboard.capacity.weightReady}
+                  target={dashboard.capacity.targets.weight}
+                  fill={dashboard.capacity.weightFill}
+                />
+                <CapacityRow
+                  label="CBM"
+                  ready={dashboard.capacity.cbmReady}
+                  target={dashboard.capacity.targets.cbm}
+                  fill={dashboard.capacity.cbmFill}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Targets assume 5,000 kg / 28 m³ per load. Adjust in logic if you use
+                  different capacity.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-3">
@@ -540,6 +741,48 @@ export default function Home() {
             </div>
           </div>
 
+          <div className="rounded-2xl border border-border bg-card/80 p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                  Attention list
+                </p>
+                <h3 className="text-lg font-semibold">Exceptions to clear</h3>
+              </div>
+              <AlertTriangle className="size-5 text-amber-500" />
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {loading ? (
+                <div className="col-span-3 h-20 animate-pulse rounded-xl bg-muted/60" />
+              ) : dashboard.exceptions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No exceptions right now. Keep it up.
+                </p>
+              ) : (
+                dashboard.exceptions.map((ex, idx) => (
+                  <div
+                    key={`${ex.title}-${idx}`}
+                    className="flex items-start gap-3 rounded-xl border border-border bg-background/60 px-4 py-3"
+                  >
+                    <div
+                      className={`mt-0.5 size-2.5 rounded-full ${
+                        ex.level === "alert"
+                          ? "bg-rose-500"
+                          : ex.level === "warning"
+                            ? "bg-amber-500"
+                            : "bg-blue-500"
+                      }`}
+                    />
+                    <div className="space-y-1 text-sm">
+                      <p className="font-semibold">{ex.title}</p>
+                      <p className="text-xs text-muted-foreground">{ex.detail}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="rounded-2xl border border-border bg-card/80 p-6 shadow-sm">
               <div className="flex items-center justify-between gap-2">
@@ -695,6 +938,104 @@ function StatCard({
           ) : null}
         </>
       )}
+    </div>
+  )
+}
+
+function SlaRow({
+  label,
+  avgDays,
+  maxDays,
+  count,
+  warnThreshold,
+  dangerThreshold,
+  extraHint,
+}: {
+  label: string
+  avgDays: number
+  maxDays: number
+  count: number
+  warnThreshold: number
+  dangerThreshold: number
+  extraHint?: string
+}) {
+  const severity =
+    maxDays >= dangerThreshold ? "danger" : maxDays >= warnThreshold ? "warn" : "ok"
+  const badgeClass =
+    severity === "danger"
+      ? "bg-rose-100 text-rose-700"
+      : severity === "warn"
+        ? "bg-amber-100 text-amber-800"
+        : "bg-emerald-100 text-emerald-800"
+
+  return (
+    <div className="rounded-xl border border-border bg-background/60 px-4 py-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-semibold">{label}</p>
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${badgeClass}`}>
+          {count} items
+        </span>
+      </div>
+      <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+        <span>Avg: {avgDays.toFixed(1)}d</span>
+        <span>Max: {maxDays.toFixed(1)}d</span>
+        {extraHint ? <span className="text-[11px] text-muted-foreground/80">{extraHint}</span> : null}
+      </div>
+    </div>
+  )
+}
+
+function TrendBars({ trend }: { trend: { id: number; label: string; rate: number }[] }) {
+  if (!trend.length) {
+    return <p className="text-sm text-muted-foreground">No shipments yet.</p>
+  }
+  return (
+    <div className="flex items-end gap-2">
+      {trend.map((point) => {
+        const safeRate = Math.min(Math.max(point.rate, 0), 1)
+        const height = `${Math.max(10, safeRate * 100)}%`
+        const barClass =
+          safeRate >= 0.95
+            ? "bg-emerald-500"
+            : safeRate >= 0.75
+              ? "bg-amber-400"
+              : "bg-rose-500"
+        return (
+          <div key={point.id} className="flex w-12 flex-col items-center gap-1 text-[11px] text-muted-foreground">
+            <div className="flex h-20 w-full items-end overflow-hidden rounded-md bg-muted/60">
+              <div className={`${barClass} w-full`} style={{ height }} />
+            </div>
+            <span className="w-full truncate text-center">{point.label}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function CapacityRow({
+  label,
+  ready,
+  target,
+  fill,
+}: {
+  label: string
+  ready: number
+  target: number
+  fill: number
+}) {
+  const capped = Math.min(Math.max(fill, 0), 1)
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <p className="font-medium">{label}</p>
+        <span className="text-xs text-muted-foreground">
+          {ready.toFixed(1)} / {target} {label === "Weight" ? "kg" : "m³"}
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-muted">
+        <div className="h-full bg-blue-500" style={{ width: percent(capped) }} />
+      </div>
     </div>
   )
 }
