@@ -138,7 +138,15 @@ export default function ShipmentsPage() {
     let collectedAmount = 0
 
     shipments.forEach((s) => {
-      if ((s.status ?? "").toUpperCase() === "DELIVERED") completedShipments += 1
+      const statusUpper = (s.status ?? "").toUpperCase()
+      const allCartonsDelivered =
+        (s.cartonDetails?.length ?? 0) > 0 &&
+        s.cartonDetails.every((c) => {
+          const cartonStatus = (c.status ?? "").toUpperCase()
+          return Boolean(c.deliveredAt) || cartonStatus === "DELIVERED"
+        })
+      const shipmentDelivered = statusUpper === "DELIVERED" || allCartonsDelivered
+      if (shipmentDelivered) completedShipments += 1
       const cartonCount = s.cartonDetails?.length ?? s.cartons?.length ?? 0
       totalCartons += cartonCount
       deliveredCartons +=

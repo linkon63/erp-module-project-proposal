@@ -62,6 +62,7 @@ type EnrichedShipment = Shipment & {
   deliveredCartons: number
   pendingCartons: number
   createdTs: number
+  delivered: boolean
 }
 
 type Tone = "emerald" | "blue" | "amber" | "violet"
@@ -148,6 +149,9 @@ export default function Home() {
             Boolean(c.deliveredAt) ||
             (c.status ?? "").toUpperCase() === "DELIVERED"
         ).length || 0
+      const delivered =
+        (s.status ?? "").toUpperCase() === "DELIVERED" ||
+        (totalCartons > 0 && deliveredCartons === totalCartons)
 
       return {
         ...s,
@@ -158,14 +162,14 @@ export default function Home() {
         deliveredCartons,
         pendingCartons: Math.max(totalCartons - deliveredCartons, 0),
         createdTs: s.createdAt ? new Date(s.createdAt).getTime() : 0,
+        delivered,
       }
     })
 
     const shipmentTotals = shipmentsEnriched.reduce(
       (acc, s) => {
-        const status = (s.status ?? "").toUpperCase()
         acc.totalShipments += 1
-        if (status === "DELIVERED") acc.deliveredShipments += 1
+        if (s.delivered) acc.deliveredShipments += 1
         else acc.inTransitShipments += 1
         acc.totalCartons += s.totalCartons
         acc.deliveredCartons += s.deliveredCartons
