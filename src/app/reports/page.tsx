@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
@@ -249,7 +249,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <AppShell>
+    <AppShell wide contentClassName="max-w-full">
       {() => (
         <div className="flex flex-col gap-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -281,10 +281,10 @@ export default function ReportsPage() {
           ) : null}
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <SummaryCard label="Shipments" primary={`${summary.shipmentsCount}`} secondary={`Delivered: ${summary.deliveredShipments}`} loading={loading} />
-            <SummaryCard label="Cartons" primary={`${summary.totalCartons}`} secondary={`Delivered: ${summary.deliveredCartons}`} loading={loading} />
-            <SummaryCard label="Financials" primary={formatCurrency(summary.collected)} secondary={`Billed: ${formatCurrency(summary.billed)} · Due: ${formatCurrency(summary.due)}`} loading={loading} />
-            <SummaryCard label="Box requests" primary={`Pending: ${summary.pendingRequests}`} secondary={`Approved: ${summary.approvedRequests}`} loading={loading} />
+            <SummaryCard tone="violet" label="Shipments" primary={`${summary.shipmentsCount}`} secondary={`Delivered: ${summary.deliveredShipments}`} loading={loading} />
+            <SummaryCard tone="blue" label="Cartons" primary={`${summary.totalCartons}`} secondary={`Delivered: ${summary.deliveredCartons}`} loading={loading} />
+            <SummaryCard tone="emerald" label="Financials" primary={formatCurrency(summary.collected)} secondary={`Billed: ${formatCurrency(summary.billed)} · Due: ${formatCurrency(summary.due)}`} loading={loading} />
+            <SummaryCard tone="amber" label="Box requests" primary={`Pending: ${summary.pendingRequests}`} secondary={`Approved: ${summary.approvedRequests}`} loading={loading} />
           </div>
 
           <div className="rounded-2xl border border-border bg-card/70 p-4 shadow-sm backdrop-blur">
@@ -300,57 +300,114 @@ export default function ReportsPage() {
               </span>
             </div>
             <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[900px] border-collapse text-sm">
-                <thead className="bg-muted/40 text-muted-foreground">
-                  <tr>
-                    <th className="border border-border px-3 py-2 text-left">Shipment</th>
-                    <th className="border border-border px-3 py-2 text-left">Status</th>
-                    <th className="border border-border px-3 py-2 text-left">From → To</th>
-                    <th className="border border-border px-3 py-2 text-left">Cartons</th>
-                    <th className="border border-border px-3 py-2 text-left">Billed</th>
-                    <th className="border border-border px-3 py-2 text-left">Collected</th>
-                    <th className="border border-border px-3 py-2 text-left">Due</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? (
-                    <tr>
-                      <td colSpan={7} className="border border-border px-3 py-4 text-center text-muted-foreground">
+          <table className="w-full min-w-[900px] border-collapse text-sm">
+            <thead className="bg-muted/40 text-muted-foreground">
+              <tr>
+                <th className="border border-border px-3 py-2 text-left">Shipment</th>
+                <th className="border border-border px-3 py-2 text-left">Status</th>
+                <th className="border border-border px-3 py-2 text-left">From → To</th>
+                <th className="border border-border px-3 py-2 text-left">Cartons</th>
+                <th className="border border-border px-3 py-2 text-left">Delivered</th>
+                <th className="border border-border px-3 py-2 text-left">Billed</th>
+                <th className="border border-border px-3 py-2 text-left">Collected</th>
+                <th className="border border-border px-3 py-2 text-left">Due</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                      <td colSpan={8} className="border border-border px-3 py-4 text-center text-muted-foreground">
                         Loading…
                       </td>
                     </tr>
                   ) : shipmentsEnriched.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="border border-border px-3 py-4 text-center text-muted-foreground">
+                      <td colSpan={8} className="border border-border px-3 py-4 text-center text-muted-foreground">
                         No shipments yet.
                       </td>
                     </tr>
                   ) : (
                     shipmentsEnriched.map((s) => {
+                      const deliveredCartons =
+                        s.cartonDetails?.filter(
+                          (c) =>
+                            (c.status ?? "").toUpperCase() === "DELIVERED" || Boolean(c.deliveredAt)
+                          ) ?? []
                       return (
-                        <tr key={s.id} className="bg-background/80">
-                          <td className="border border-border px-3 py-2 font-semibold text-foreground">
-                            {s.shipmentNo}
-                          </td>
-                          <td className="border border-border px-3 py-2 uppercase text-xs text-muted-foreground">
-                            {s.status}
-                          </td>
-                          <td className="border border-border px-3 py-2 text-muted-foreground">
-                            {s.fromWarehouse} → {s.toWarehouse}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {s.totalCartons}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {formatCurrency(s.billed ?? 0)}
-                          </td>
-                          <td className="border border-border px-3 py-2">
-                            {formatCurrency(s.collected ?? 0)}
-                          </td>
-                          <td className="border border-border px-3 py-2 text-amber-700">
-                            {formatCurrency(s.due ?? 0)}
-                          </td>
-                        </tr>
+                        <React.Fragment key={s.id}>
+                          <tr className="bg-background/80">
+                            <td className="border border-border px-3 py-2 font-semibold text-foreground">
+                              {s.shipmentNo}
+                            </td>
+                            <td className="border border-border px-3 py-2 uppercase text-xs text-muted-foreground">
+                              {s.delivered ? "DELIVERED" : s.status}
+                            </td>
+                            <td className="border border-border px-3 py-2 text-muted-foreground">
+                              {s.fromWarehouse} → {s.toWarehouse}
+                            </td>
+                            <td className="border border-border px-3 py-2">
+                              {s.totalCartons}
+                            </td>
+                            <td className="border border-border px-3 py-2">
+                              {deliveredCartons.length} / {s.totalCartons}
+                            </td>
+                            <td className="border border-border px-3 py-2">
+                              {formatCurrency(s.billed ?? 0)}
+                            </td>
+                            <td className="border border-border px-3 py-2">
+                              {formatCurrency(s.collected ?? 0)}
+                            </td>
+                            <td className="border border-border px-3 py-2 text-amber-700">
+                              {formatCurrency(s.due ?? 0)}
+                            </td>
+                          </tr>
+                          <tr className="bg-muted/30">
+                            <td colSpan={8} className="border border-border px-3 py-2">
+                              {deliveredCartons.length ? (
+                                <div className="overflow-x-auto">
+                                  <table className="w-full min-w-[700px] border-collapse text-xs">
+                                    <thead className="bg-muted/50 text-muted-foreground">
+                                      <tr>
+                                        <th className="border border-border px-2 py-1 text-left">Carton</th>
+                                        <th className="border border-border px-2 py-1 text-left">Status</th>
+                                        <th className="border border-border px-2 py-1 text-left">Billed</th>
+                                        <th className="border border-border px-2 py-1 text-left">Collected</th>
+                                        <th className="border border-border px-2 py-1 text-left">Delivered at</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {deliveredCartons.map((c) => (
+                                        <tr key={c.id} className="bg-background/80">
+                                          <td className="border border-border px-2 py-1 font-semibold text-foreground">
+                                            {c.cartonNo}
+                                          </td>
+                                          <td className="border border-border px-2 py-1 uppercase text-muted-foreground">
+                                            {c.status}
+                                          </td>
+                                          <td className="border border-border px-2 py-1">
+                                            {formatCurrency(c.billedAmount ?? 0)}
+                                          </td>
+                                          <td className="border border-border px-2 py-1">
+                                            {formatCurrency(c.collectedAmount ?? 0)}
+                                          </td>
+                                          <td className="border border-border px-2 py-1">
+                                            {c.deliveredAt
+                                              ? new Date(c.deliveredAt).toLocaleDateString()
+                                              : "—"}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-muted-foreground">
+                                  No cartons marked delivered for this shipment yet.
+                                </p>
+                              )}
+                            </td>
+                          </tr>
+                        </React.Fragment>
                       )
                     })
                   )}
@@ -369,20 +426,46 @@ function SummaryCard({
   primary,
   secondary,
   loading,
+  tone = "blue",
 }: {
   label: string
   primary: string
   secondary?: string
   loading?: boolean
+  tone?: "blue" | "violet" | "emerald" | "amber"
 }) {
+  const toneStyles: Record<
+    NonNullable<typeof tone>,
+    { card: string; accent: string }
+  > = {
+    blue: {
+      card: "from-blue-600/15 via-blue-50 to-white border-blue-200",
+      accent: "text-blue-900",
+    },
+    violet: {
+      card: "from-violet-600/15 via-violet-50 to-white border-violet-200",
+      accent: "text-violet-900",
+    },
+    emerald: {
+      card: "from-emerald-600/15 via-emerald-50 to-white border-emerald-200",
+      accent: "text-emerald-900",
+    },
+    amber: {
+      card: "from-amber-500/15 via-amber-50 to-white border-amber-200",
+      accent: "text-amber-900",
+    },
+  }
+  const styles = toneStyles[tone]
   return (
-    <div className="rounded-xl border border-border bg-card/80 p-4 shadow-sm">
+    <div
+      className={`rounded-xl border bg-gradient-to-br p-4 shadow-sm ${styles.card}`}
+    >
       <p className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
       {loading ? (
         <div className="mt-2 h-8 animate-pulse rounded-md bg-muted" />
       ) : (
         <>
-          <p className="text-xl font-semibold text-foreground">{primary}</p>
+          <p className={`text-xl font-semibold ${styles.accent}`}>{primary}</p>
           {secondary ? <p className="text-xs text-muted-foreground">{secondary}</p> : null}
         </>
       )}
