@@ -58,6 +58,7 @@ export default function ChinaWarehousePage() {
   const [creatingBox, setCreatingBox] = useState(false)
   const [filterMode, setFilterMode] = useState<"all" | "today" | "yesterday" | "date">("today")
   const [filterDate, setFilterDate] = useState<string>("")
+  const [searchQuery, setSearchQuery] = useState("")
 
   useEffect(() => {
     async function load() {
@@ -128,9 +129,59 @@ export default function ChinaWarehousePage() {
     [cartons, dateMatches]
   )
 
+  const normalizedSearch = searchQuery.trim().toLowerCase()
+
+  const scoredCartons = useMemo(() => {
+    if (!normalizedSearch) {
+      return filteredCartons.map((carton) => ({ carton, score: 0 }))
+    }
+    return filteredCartons.map((carton) => {
+      const fields = [
+        carton.cartonNo,
+        carton.writtenCartonNo,
+        carton.goods?.name,
+        carton.goods?.nameCn,
+        carton.trackingNo,
+      ]
+      let score = 0
+      fields.forEach((field) => {
+        if (!field) return
+        const val = field.toString().toLowerCase()
+        if (val === normalizedSearch) score += 3
+        else if (val.includes(normalizedSearch)) score += 1
+      })
+      return { carton, score }
+    })
+  }, [filteredCartons, normalizedSearch])
+
+  const matchIds = useMemo(
+    () =>
+      new Set(
+        scoredCartons.filter((item) => item.score > 0).map((item) => item.carton.id)
+      ),
+    [scoredCartons]
+  )
+
   const visibleCartons = useMemo(
-    () => filteredCartons.filter((c) => !isHidden(c)),
-    [filteredCartons, isHidden]
+    () =>
+      scoredCartons
+        .filter(({ carton }) => !isHidden(carton))
+        .sort((a, b) => {
+          if (normalizedSearch && b.score !== a.score) {
+            return b.score - a.score
+          }
+          const aNo = (a.carton.cartonNo || "").toUpperCase()
+          const bNo = (b.carton.cartonNo || "").toUpperCase()
+          if (aNo === bNo) {
+            return (
+              new Date(b.carton.createdAt).getTime() -
+              new Date(a.carton.createdAt).getTime()
+            )
+          }
+          return aNo.localeCompare(bNo)
+        })
+        .map((item) => item.carton),
+    [isHidden, normalizedSearch, scoredCartons]
   )
 
   const allSelected = useMemo(
@@ -159,21 +210,9 @@ export default function ChinaWarehousePage() {
     })
   }
 
-  const display = useMemo(() => {
-    return [...filteredCartons].sort((a, b) => {
-      const aNo = (a.cartonNo || "").toUpperCase()
-      const bNo = (b.cartonNo || "").toUpperCase()
-      if (aNo === bNo) {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      }
-      return aNo.localeCompare(bNo)
-    })
-  }, [filteredCartons])
-
   const groupedDisplay = useMemo(() => {
     const groups: { cartonNo: string; items: Carton[] }[] = []
-    display
-      .filter((c) => !isHidden(c))
+    visibleCartons
       .forEach((carton) => {
         const key = carton.cartonNo ?? ""
         const last = groups[groups.length - 1]
@@ -184,7 +223,7 @@ export default function ChinaWarehousePage() {
         }
       })
     return groups
-  }, [display, isHidden])
+  }, [visibleCartons])
 
   const selectedCartons = useMemo(
     () => visibleCartons.filter((c) => selected.has(c.id)),
@@ -471,7 +510,7 @@ export default function ChinaWarehousePage() {
       {() => (
         <>
           <div className="flex flex-col gap-6">
-            <div className="sticky top-0 z-20 -mx-1 -mt-1 rounded-2xl border border-border/70 bg-background/80 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70">
+            <div className="sticky top-0 z-20 -mx-1 -mt-1 rounded-2xl bg-background/80 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
@@ -516,6 +555,11 @@ export default function ChinaWarehousePage() {
                       className="h-8 w-36 px-2 text-xs"
                     />
                   </div>
+                  <CartonSearch
+                    value={searchQuery}
+                    onChange={(value) => setSearchQuery(value)}
+                    onClear={() => setSearchQuery("")}
+                  />
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button asChild size="sm">
@@ -605,7 +649,7 @@ export default function ChinaWarehousePage() {
                         {error}
                       </td>
                     </tr>
-                  ) : display.length === 0 ? (
+                  ) : groupedDisplay.length === 0 ? (
                     <tr>
                       <td colSpan={18} className="border border-border px-3 py-4 text-center text-sm text-muted-foreground">
                         No cartons found.
@@ -624,11 +668,15 @@ export default function ChinaWarehousePage() {
                         return group.items.map((carton, idx) => {
                           const requested = carton.status?.toUpperCase().startsWith("BOX")
                           const shipped = isShippedStatus(carton.status)
-                          const rowClasses = requested
+                          const matched = matchIds.has(carton.id)
+                          const baseRowClasses = requested
                             ? "bg-blue-100 hover:bg-blue-200"
                             : shipped
                               ? "bg-muted/40"
                               : "bg-card hover:bg-muted/30"
+                          const rowClasses = matched
+                            ? "bg-amber-100 ring-2 ring-amber-300 hover:bg-amber-200"
+                            : baseRowClasses
                           return (
                             <tr key={carton.id} className={rowClasses}>
                               {idx === 0 ? (
@@ -1161,6 +1209,40 @@ function BoxRequestModal({
             {creating ? "Requesting..." : "Request box"}
           </Button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function CartonSearch({
+  value,
+  onChange,
+  onClear,
+}: {
+  value: string
+  onChange: (val: string) => void
+  onClear: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border border-border px-2 py-1">
+      <Input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Search cartons..."
+        className="h-8 w-44 px-2 text-xs"
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-8 px-2 text-xs text-red-600 hover:text-red-700"
+        onClick={onClear}
+        disabled={!value}
+      >
+        ✕
+      </Button>
+      <div className="text-[11px] font-medium text-muted-foreground">
+        Fields: Carton #, Written #, Name (EN/CN), Tracking #
       </div>
     </div>
   )
