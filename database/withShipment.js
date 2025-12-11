@@ -74,19 +74,19 @@ async function main() {
   ]
 
   const dateBuckets = [
-    { createdAt: startOfDay(new Date()), status: "AT_CHINA_WH" }, // today
-    { createdAt: startOfDay(Date.now() - DAY_MS), status: "AT_CHINA_WH" }, // yesterday
-    { createdAt: startOfDay(Date.now() - DAY_MS * 2), status: "AT_CHINA_WH" }, // day before yesterday
+    { createdAt: startOfDay(new Date()), status: "AT_CHINA_WH" },
+    { createdAt: startOfDay(Date.now() - DAY_MS), status: "IN_SHIPMENT" },
+    { createdAt: startOfDay(Date.now() - DAY_MS * 2), status: "DELIVERED" },
   ]
 
-  // 1000 cartons with full fields and staggered creation dates (400/300/300 buckets)
-  const cartonSeeds = Array.from({ length: 1000 }, (_, idx) => {
+  // 150 cartons with full fields and staggered creation dates (50 per day bucket)
+  const cartonSeeds = Array.from({ length: 150 }, (_, idx) => {
     const n = idx + 1
-    const padded = n.toString().padStart(5, "0")
-    const bucketIndex = idx < 400 ? 0 : idx < 700 ? 1 : 2
+    const padded = n.toString().padStart(4, "0")
+    const bucketIndex = idx < 50 ? 0 : idx < 100 ? 1 : 2
     const bucket = dateBuckets[bucketIndex]
     const createdAt = bucket.createdAt
-    const prefix = "CN"
+    const prefix = idx % 2 === 0 ? "CN" : "BD"
     const goodsKeys = ["Garments (T-Shirts)", "Electronics Accessories", "Footwear"]
     const goodsKey = goodsKeys[idx % goodsKeys.length]
     const trackingNo = `TRK-${prefix}-${padded}`
@@ -101,7 +101,8 @@ async function main() {
       bucketIndex === 2
         ? billedAmount
         : Number((billedAmount * (bucketIndex === 1 ? 0.6 : 0.3)).toFixed(2))
-    const deliveredAt = null
+    const deliveredAt =
+      bucketIndex === 2 ? new Date(createdAt.getTime() + 36 * 60 * 60 * 1000) : null
     const customer = customers[idx % customers.length]
     const shippingMark = `${customer} / ${trackingNo}`
 
@@ -126,9 +127,8 @@ async function main() {
       remarks: `Handle with care - batch ${bucketIndex + 1}`,
       copyNumber: `CPY-${padded}`,
       notes: `Note ${n}`,
-      warehouseId: chinaWh.id,
-    // Keep all cartons visible in the China warehouse table
-      status: "AT_CHINA_WH",
+      warehouseId: prefix === "CN" ? chinaWh.id : bdWh.id,
+      status: bucket.status,
       isCombinedCarton: false,
       childCartons: "[]",
       createdAt,
@@ -146,6 +146,44 @@ async function main() {
     )
   )
 
+  // Two shipments only: first with 10 cartons, second with 15 cartons
+  const shipmentGroups = [
+    { shipmentNo: "SHP-001", start: 0, end: 10, status: "PLANNED" },
+    { shipmentNo: "SHP-002", start: 10, end: 25, status: "IN_TRANSIT" },
+  ]
+
+  for (const group of shipmentGroups) {
+    const cartonsSlice = cartonSeeds.slice(group.start, group.end)
+    if (cartonsSlice.length === 0) continue
+
+    const cartonNos = cartonsSlice.map((c) => c.cartonNo)
+    const totalPrice = cartonsSlice.reduce((sum, c) => sum + (c.billedAmount ?? 0), 0)
+    const collectedAmount = cartonsSlice.reduce(
+      (sum, c) => sum + (c.collectedAmount ?? 0),
+      0
+    )
+
+    await prisma.shipment.upsert({
+      where: { shipmentNo: group.shipmentNo },
+      update: {
+        cartons: JSON.stringify(cartonNos),
+        totalPrice,
+        collectedAmount,
+        status: group.status,
+      },
+      create: {
+        shipmentNo: group.shipmentNo,
+        fromWarehouse: "China Warehouse",
+        toWarehouse: "Bangladesh Warehouse",
+        plannedShipDate: new Date(cartonsSlice[0].createdAt.getTime() + 6 * 60 * 60 * 1000),
+        status: group.status,
+        totalPrice,
+        collectedAmount,
+        ratePerKg: 6.5,
+        cartons: JSON.stringify(cartonNos),
+      },
+    })
+  }
 }
 
 main()
