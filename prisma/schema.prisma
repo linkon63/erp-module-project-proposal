@@ -66,6 +66,9 @@ model Carton {
   isCombinedCarton Boolean    @default(false)
   childCartons     String    @default("[]")
   printedCartonNo  String?
+  billedAmount     Float     @default(0)
+  collectedAmount  Float     @default(0)
+  deliveredAt      DateTime?
 
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
@@ -82,6 +85,7 @@ model Shipment {
   status          String    @default("PLANNED")
   totalPrice      Float     @default(0)
   collectedAmount Float     @default(0)
+  ratePerKg       Float     @default(0)
   cartons         String    @default("[]")
 
   createdAt       DateTime  @default(now())

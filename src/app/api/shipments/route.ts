@@ -13,6 +13,7 @@ type ShipmentPayload = {
   status?: string
   totalPrice?: number
   collectedAmount?: number
+  ratePerKg?: number
   cartonNos?: string[]
   cartonIds?: number[]
 }
@@ -52,11 +53,22 @@ export async function GET() {
       const details = cartonNos
         .map((no) => cartonMap.get(no))
         .filter(Boolean)
+      const collectedFromDetails = details.reduce(
+        (sum, c) => sum + (c?.collectedAmount ?? 0),
+        0
+      )
+      const billedFromDetails = details.reduce(
+        (sum, c) => sum + (c?.billedAmount ?? 0),
+        0
+      )
+      const collectedAmount = Math.max(collectedFromDetails, shipment.collectedAmount ?? 0)
       return {
         ...shipment,
         cartons: cartonNos,
         cartonDetails: details,
-        collectedAmount: shipment.collectedAmount,
+        collectedAmount,
+        totalPrice: shipment.totalPrice ?? billedFromDetails,
+        ratePerKg: shipment.ratePerKg,
       }
     }),
   })
@@ -141,7 +153,18 @@ export async function POST(req: Request) {
       ? new Date(body.plannedShipDate)
       : null
 
+    const ratePerKg = body.ratePerKg != null ? Number(body.ratePerKg) : 0
+
     const shipment = await prisma.$transaction(async (tx) => {
+      // compute per-carton charges
+      const chargesById = new Map<number, number>()
+      shippableCartons.forEach((c) => {
+        const charge = (c.weightKg ?? 0) * ratePerKg
+        chargesById.set(c.id, charge)
+      })
+
+      const totalCharge = Array.from(chargesById.values()).reduce((a, b) => a + b, 0)
+
       const created = await tx.shipment.create({
         data: {
           shipmentNo: body.shipmentNo.trim(),
@@ -149,7 +172,8 @@ export async function POST(req: Request) {
           toWarehouse: body.toWarehouse ?? "Bangladesh Warehouse",
           plannedShipDate: plannedShipDate ?? undefined,
           status: body.status ?? "PLANNED",
-          totalPrice: totalPrice != null ? Number(totalPrice) : 0,
+          totalPrice: totalPrice != null ? Number(totalPrice) : totalCharge,
+          ratePerKg,
           collectedAmount: Number(collectedAmount) || 0,
           cartons: JSON.stringify(shipmentCartonNos),
         },
@@ -159,6 +183,17 @@ export async function POST(req: Request) {
         where: { id: { in: shipmentCartonIds } },
         data: { status: "IN_SHIPMENT" },
       })
+
+      // set per-carton billing
+      for (const c of shippableCartons) {
+        await tx.carton.update({
+          where: { id: c.id },
+          data: {
+            billedAmount: chargesById.get(c.id) ?? 0,
+            collectedAmount: 0,
+          },
+        })
+      }
 
       return created
     })
@@ -198,17 +233,51 @@ export async function PUT(req: Request) {
       return NextResponse.json({ error: "id must be a number" }, { status: 400 })
     }
 
-    const body = (await req.json()) as { collectedAmount?: number }
-    if (body.collectedAmount === undefined || Number.isNaN(Number(body.collectedAmount))) {
-      return NextResponse.json({ error: "collectedAmount is required and must be a number" }, { status: 400 })
+    const body = (await req.json()) as { collectedAmount?: number; status?: string }
+    const hasCollected = body.collectedAmount !== undefined
+    const hasStatus = typeof body.status === "string" && body.status.trim().length > 0
+
+    if (!hasCollected && !hasStatus) {
+      return NextResponse.json(
+        { error: "collectedAmount or status is required" },
+        { status: 400 }
+      )
     }
 
-    const shipment = await prisma.shipment.update({
-      where: { id },
-      data: { collectedAmount: Number(body.collectedAmount) },
+    if (hasCollected && Number.isNaN(Number(body.collectedAmount))) {
+      return NextResponse.json({ error: "collectedAmount must be a number" }, { status: 400 })
+    }
+
+    const shipment = await prisma.shipment.findUnique({ where: { id } })
+    if (!shipment) {
+      return NextResponse.json({ error: "Shipment not found" }, { status: 404 })
+    }
+
+    const normalizedStatus = hasStatus ? body.status!.trim().toUpperCase() : null
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const updatedShipment = await tx.shipment.update({
+        where: { id },
+        data: {
+          collectedAmount: hasCollected ? Number(body.collectedAmount) : undefined,
+          status: normalizedStatus ?? undefined,
+        },
+      })
+
+      if (normalizedStatus === "DELIVERED") {
+        const cartonNos = parseJsonArray(shipment.cartons)
+        if (cartonNos.length) {
+          await tx.carton.updateMany({
+            where: { cartonNo: { in: cartonNos } },
+            data: { status: "DELIVERED", deliveredAt: new Date() },
+          })
+        }
+      }
+
+      return updatedShipment
     })
 
-    return NextResponse.json({ shipment })
+    return NextResponse.json({ shipment: updated })
   } catch (error) {
     console.error("Error updating shipment collection", error)
     return NextResponse.json({ error: "Unable to update shipment collection" }, { status: 500 })

@@ -11,6 +11,7 @@ type CartonPayload = {
   cartonNo: string
   writtenCartonNo?: string
   trackingNo?: string
+  billedAmount?: number
   goodsId?: number
   goodsNameEn?: string
   goodsNameCn?: string
@@ -151,6 +152,7 @@ export async function POST(req: Request) {
         printedCartonNo: cartonNo,
         writtenCartonNo: body.writtenCartonNo?.trim(),
         trackingNo: body.trackingNo?.trim(),
+        billedAmount: parseNumber(body.billedAmount) ?? undefined,
         goodsId,
         packNo: body.packNo?.trim(),
         unitPcs: parseNumber(body.unitPcs) ?? undefined,
@@ -292,6 +294,7 @@ export async function PUT(req: Request) {
         printedCartonNo: cartonNo,
         writtenCartonNo: body.writtenCartonNo?.trim() ?? null,
         trackingNo: body.trackingNo?.trim() ?? null,
+        billedAmount: parseNumber(body.billedAmount) ?? undefined,
         goodsId,
         packNo: body.packNo?.trim() ?? null,
         unitPcs: parseNumber(body.unitPcs) ?? undefined,
@@ -319,5 +322,96 @@ export async function PUT(req: Request) {
       { error: "Unable to update carton" },
       { status: 500 }
     )
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url)
+    const idParam = searchParams.get("id")
+
+    if (!idParam) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 })
+    }
+    const id = Number(idParam)
+    if (Number.isNaN(id)) {
+      return NextResponse.json({ error: "id must be a number" }, { status: 400 })
+    }
+
+    const body = (await req.json()) as {
+      collectedAmount?: number
+      billedAmount?: number
+      delivered?: boolean
+      deliveredAt?: string
+      status?: string
+    }
+
+    const hasCollected = body.collectedAmount !== undefined
+    const hasBilled = body.billedAmount !== undefined
+    const hasDeliveredFlag = body.delivered === true
+    const hasDeliveredAt = typeof body.deliveredAt === "string" && body.deliveredAt.trim().length > 0
+    const hasStatus = typeof body.status === "string" && body.status.trim().length > 0
+
+    if (!hasCollected && !hasBilled && !hasDeliveredFlag && !hasDeliveredAt && !hasStatus) {
+      return NextResponse.json(
+        { error: "Provide collectedAmount, billedAmount, delivered flag/date, or status to update" },
+        { status: 400 }
+      )
+    }
+
+    if (hasCollected && Number.isNaN(Number(body.collectedAmount))) {
+      return NextResponse.json({ error: "collectedAmount must be a number" }, { status: 400 })
+    }
+    if (hasBilled && Number.isNaN(Number(body.billedAmount))) {
+      return NextResponse.json({ error: "billedAmount must be a number" }, { status: 400 })
+    }
+
+    const normalizedStatus = hasStatus ? body.status!.trim() : undefined
+    const deliveredAt = hasDeliveredAt
+      ? new Date(body.deliveredAt!)
+      : hasDeliveredFlag
+        ? new Date()
+        : undefined
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const carton = await tx.carton.update({
+        where: { id },
+        data: {
+          collectedAmount: hasCollected ? Number(body.collectedAmount) : undefined,
+          billedAmount: hasBilled ? Number(body.billedAmount) : undefined,
+          deliveredAt,
+          status: normalizedStatus ?? (hasDeliveredFlag ? "DELIVERED" : undefined),
+        },
+        include: { goods: true, warehouse: true },
+      })
+
+      // keep shipment collected totals in sync
+      const relatedShipments = await tx.shipment.findMany({
+        where: { cartons: { contains: carton.cartonNo } },
+      })
+
+      for (const shipment of relatedShipments) {
+        const cartonNos = parseJsonArray(shipment.cartons)
+        if (!cartonNos.length) continue
+        const cartons = await tx.carton.findMany({
+          where: { cartonNo: { in: cartonNos } },
+        })
+        const collectedSum = cartons.reduce(
+          (sum, c) => sum + (c.collectedAmount ?? 0),
+          0
+        )
+        await tx.shipment.update({
+          where: { id: shipment.id },
+          data: { collectedAmount: collectedSum },
+        })
+      }
+
+      return carton
+    })
+
+    return NextResponse.json({ carton: formatCarton(updated) })
+  } catch (error) {
+    console.error("Error partially updating carton", error)
+    return NextResponse.json({ error: "Unable to update carton" }, { status: 500 })
   }
 }

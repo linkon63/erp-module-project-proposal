@@ -112,7 +112,9 @@ async function main() {
     const widthCm = 38 + (idx % 4)
     const heightCm = 32 + (idx % 3)
     const cbm = Number(((lengthCm * widthCm * heightCm) / 1000000).toFixed(3))
+    const weightKg = Number((25 + idx * 0.8).toFixed(1))
     const baseStatus = inChina ? "AT_CHINA_WH" : "AT_BD_WH"
+    const billedAmount = Number((weightKg * 6).toFixed(2))
 
     return {
       cartonNo: `${inChina ? "CN" : "BD"}-${padded}`,
@@ -121,12 +123,13 @@ async function main() {
       goodsId: goodsRecords[goodsKey].id,
       packNo: `PK-${padded}`,
       unitPcs: 80 + (idx % 5) * 10,
-      weightKg: Number((25 + idx * 0.8).toFixed(1)),
+      weightKg,
       lengthCm,
       widthCm,
       heightCm,
       cbm,
       unitPrice: 150 + idx * 5,
+      billedAmount,
       shippingMark: goodsRecords[goodsKey].shippingMark,
       warehouseId: inChina ? chinaWh.id : bdWh.id,
       status: baseStatus,
@@ -158,6 +161,7 @@ async function main() {
       unitPcs: 170,
       weightKg: 58.0,
       cbm: 0.14,
+      billedAmount: 58.0 * 6,
       shippingMark: goodsRecords["Electronics Accessories"].shippingMark,
       warehouseId: chinaWh.id,
       status: "COMBINED",
