@@ -170,6 +170,7 @@ export default function ShipmentsPage() {
                   (c) => Boolean(c.deliveredAt) || (c.status ?? "").toUpperCase() === "DELIVERED"
                 ).length ?? 0
               const pendingCartons = Math.max(totalCartons - deliveredCartons, 0)
+              const isExpanded = expanded.has(shipment.id)
               const toggleExpanded = () =>
                 setExpanded((prev) => {
                   const next = new Set(prev)
@@ -197,7 +198,7 @@ export default function ShipmentsPage() {
                   key={shipment.id}
                   className={cardClasses + " cursor-pointer"}
                   role="button"
-                  aria-expanded={expanded.has(shipment.id)}
+                  aria-expanded={isExpanded}
                   onClick={toggleExpanded}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
@@ -283,12 +284,15 @@ export default function ShipmentsPage() {
                           toggleExpanded()
                         }}
                       >
-                        {expanded.has(shipment.id) ? "Hide cartons" : "View cartons"}
+                        {isExpanded ? "Hide cartons" : "View cartons"}
                       </Button>
                     </div>
                     </div>
-                  {expanded.has(shipment.id) ? (
-                    <div className="mt-3 rounded-lg border border-dashed border-border/70 bg-muted/20 p-3 text-sm text-muted-foreground">
+                  {isExpanded ? (
+                    <div
+                      className="mt-3 rounded-lg border border-dashed border-border/70 bg-muted/20 p-3 text-sm text-muted-foreground"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {shipment.cartonDetails && shipment.cartonDetails.length ? (
                         <>
                       <div className="overflow-x-auto">
