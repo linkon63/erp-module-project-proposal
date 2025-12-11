@@ -283,6 +283,8 @@ export default function ShipmentsPage() {
                               const billed = c.billedAmount ?? 0
                               const collected = c.collectedAmount ?? 0
                               const due = Math.max(billed - collected, 0)
+                              const displayBilled = Math.round(billed)
+                              const displayDue = Math.round(due)
                               const deliveredLabel = c.deliveredAt
                                 ? new Date(c.deliveredAt).toLocaleDateString()
                                 : "—"
@@ -324,9 +326,9 @@ export default function ShipmentsPage() {
                                   </td>
                                   <td className="border border-border px-2 py-1">{c.cbm ?? "—"}</td>
                                   <td className="border border-border px-2 py-1">{c.shippingMark ?? "—"}</td>
-                                  <td className="border border-border px-2 py-1 text-right">{billed.toFixed(2)}</td>
+                                  <td className="border border-border px-2 py-1 text-right">{displayBilled}</td>
                                   <td className="border border-border px-2 py-1 text-right">{collected.toFixed(2)}</td>
-                                  <td className="border border-border px-2 py-1 text-right">{due.toFixed(2)}</td>
+                                  <td className="border border-border px-2 py-1 text-right">{displayDue}</td>
                                   <td className="border border-border px-2 py-1">{deliveredLabel}</td>
                                   <td className="border border-border px-2 py-1 uppercase text-muted-foreground">
                                     {c.status}

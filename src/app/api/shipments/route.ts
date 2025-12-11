@@ -45,13 +45,25 @@ export async function GET() {
       })
     : []
 
-  const cartonMap = new Map(cartonDetails.map((c) => [c.cartonNo, c]))
+  const cartonBuckets = cartonDetails.reduce((map, carton) => {
+    const list = map.get(carton.cartonNo) ?? []
+    list.push(carton)
+    map.set(carton.cartonNo, list)
+    return map
+  }, new Map<string, typeof cartonDetails>())
 
   return NextResponse.json({
     shipments: shipments.map((shipment) => {
       const cartonNos = parseJsonArray(shipment.cartons)
+      const usedIndex = new Map<string, number>()
       const details = cartonNos
-        .map((no) => cartonMap.get(no))
+        .map((no) => {
+          const bucket = cartonBuckets.get(no) ?? []
+          const idx = usedIndex.get(no) ?? 0
+          const item = bucket[idx]
+          usedIndex.set(no, idx + 1)
+          return item
+        })
         .filter(Boolean)
       const collectedFromDetails = details.reduce(
         (sum, c) => sum + (c?.collectedAmount ?? 0),
