@@ -57,50 +57,6 @@ async function main() {
     goodsRecords[record.name] = record
   }
 
-  // Users (for existing user list demo)
-  const userCount = await prisma.user.count()
-  if (userCount === 0) {
-    await prisma.user.createMany({
-      data: [
-        {
-          name: "Amira Khan",
-          email: "amira.khan@example.com",
-          role: "Operations Manager",
-          location: "Dhaka",
-          status: "active",
-        },
-        {
-          name: "Luis Chen",
-          email: "luis.chen@example.com",
-          role: "Warehouse Lead",
-          location: "Shenzhen",
-          status: "active",
-        },
-        {
-          name: "Priya Sen",
-          email: "priya.sen@example.com",
-          role: "Logistics Analyst",
-          location: "Hong Kong",
-          status: "pending",
-        },
-        {
-          name: "Michael Owusu",
-          email: "michael.owusu@example.com",
-          role: "Finance Controller",
-          location: "Singapore",
-          status: "active",
-        },
-        {
-          name: "Sara Ahmed",
-          email: "sara.ahmed@example.com",
-          role: "Compliance Officer",
-          location: "Kuala Lumpur",
-          status: "inactive",
-        },
-      ],
-    })
-  }
-
   // Cartons
   const cartonSeeds = Array.from({ length: 30 }, (_, idx) => {
     const n = idx + 1

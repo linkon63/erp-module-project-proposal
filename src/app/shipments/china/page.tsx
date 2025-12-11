@@ -46,9 +46,7 @@ export default function ShipmentsPage() {
   const [shipments, setShipments] = useState<Shipment[]>([])
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<number>>(new Set())
-  const [collectInputs, setCollectInputs] = useState<Record<number, string>>({})
   const [cartonCollectInputs, setCartonCollectInputs] = useState<Record<number, string>>({})
-  const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [savingCartonId, setSavingCartonId] = useState<number | null>(null)
   const [toast, setToast] = useState<{ message: string; type?: "error" | "info" } | null>(
     null
@@ -61,15 +59,7 @@ export default function ShipmentsPage() {
         const res = await fetch("/api/shipments")
         const data = (await res.json()) as { shipments: Shipment[] }
         setShipments(data.shipments ?? [])
-        const initialCollects: Record<number, string> = {}
         const initialCartonCollects: Record<number, string> = {}
-        data.shipments?.forEach((s) => {
-          initialCollects[s.id] = ""
-          s.cartonDetails?.forEach((c) => {
-            initialCartonCollects[c.id] = ""
-          })
-        })
-        setCollectInputs(initialCollects)
         setCartonCollectInputs(initialCartonCollects)
       } catch (err) {
         console.error(err)
@@ -379,40 +369,6 @@ export default function ShipmentsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {/* {shipment.status !== "DELIVERED" ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            try {
-                              setUpdatingId(shipment.id)
-                              const res = await fetch(`/api/shipments?id=${shipment.id}`, {
-                                method: "PUT",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ status: "DELIVERED" }),
-                              })
-                              if (!res.ok) {
-                                const body = (await res.json().catch(() => null)) as { error?: string } | null
-                                const msg = body?.error ?? "Unable to mark delivered."
-                                if (typeof window !== "undefined") window.alert(msg)
-                                return
-                              }
-                              setShipments((prev) =>
-                                prev.map((s) =>
-                                  s.id === shipment.id ? { ...s, status: "DELIVERED" } : s
-                                )
-                              )
-                            } catch (err) {
-                              console.error(err)
-                            } finally {
-                              setUpdatingId(null)
-                            }
-                          }}
-                          disabled={updatingId === shipment.id}
-                        >
-                          {updatingId === shipment.id ? "Updating..." : "Mark delivered"}
-                        </Button>
-                      ) : null} */}
                       <Button
                         size="sm"
                         variant="ghost"

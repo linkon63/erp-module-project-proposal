@@ -92,15 +92,6 @@ model Shipment {
   updatedAt       DateTime  @updatedAt
 }
 
-model User {
-  id       Int    @id @default(autoincrement())
-  name     String
-  email    String
-  role     String
-  location String
-  status   String
-}
-
 model BoxRequest {
   id                Int      @id @default(autoincrement())
   cartonId          Int

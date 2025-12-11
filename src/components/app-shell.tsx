@@ -7,12 +7,9 @@ import {
   Boxes,
   Building2,
   ChevronDown,
-  FileBarChart,
   LayoutDashboard,
-  LogOut,
   PackageSearch,
   Ship,
-  ShieldCheck,
   Warehouse,
   type LucideIcon,
 } from "lucide-react"
@@ -91,9 +88,6 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { label: "Box Request", value: "Box Request", icon: Boxes, href: "/boxrequest" },
-  { label: "Reports", value: "Reports", icon: FileBarChart },
-  { label: "ACL", value: "ACL", icon: ShieldCheck },
-  { label: "Logout", value: "Logout", icon: LogOut },
 ]
 
 type AppShellProps = {

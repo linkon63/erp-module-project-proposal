@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
@@ -40,6 +40,11 @@ export default function BoxRequestPage() {
 
   const hasApprovedSelection = requests.some(
     (req) => selectedIds.has(req.id) && req.status === "APPROVED"
+  )
+
+  const pendingIds = useMemo(
+    () => requests.filter((req) => req.status === "PENDING").map((req) => req.id),
+    [requests]
   )
 
   useEffect(() => {
