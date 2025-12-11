@@ -76,7 +76,12 @@ export default function ChinaWarehousePage() {
 
   const isShippedStatus = (status: string | null | undefined) => {
     const value = (status ?? "").toUpperCase()
-    return value.startsWith("IN_SHIPMENT") || value.startsWith("SHIPPED") || value.startsWith("SHIP")
+    return (
+      value.startsWith("IN_SHIPMENT") ||
+      value.startsWith("SHIPPED") ||
+      value.startsWith("SHIP") ||
+      value.startsWith("DELIVERED")
+    )
   }
 
   const isHidden = useCallback(

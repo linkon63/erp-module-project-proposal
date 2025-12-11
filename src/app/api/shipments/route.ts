@@ -144,16 +144,26 @@ export async function POST(req: Request) {
       )
     }
 
-    const alreadyShipped = existingCartons.filter((c) =>
-      (c.status ?? "").toUpperCase().startsWith("IN_SHIPMENT")
-    )
+    const normalizeStatus = (status?: string | null) => (status ?? "").toUpperCase()
+    const isInShipment = (status?: string | null) => normalizeStatus(status).startsWith("IN_SHIPMENT")
+    const isDelivered = (carton: typeof existingCartons[number]) => {
+      const statusUpper = normalizeStatus(carton.status)
+      return statusUpper.startsWith("DELIVERED") || Boolean(carton.deliveredAt)
+    }
+
+    const alreadyShipped = existingCartons.filter((c) => isInShipment(c.status))
+    const alreadyDelivered = existingCartons.filter((c) => isDelivered(c))
     const shippableCartons = existingCartons.filter(
-      (c) => !(c.status ?? "").toUpperCase().startsWith("IN_SHIPMENT")
+      (c) => !isInShipment(c.status) && !isDelivered(c)
     )
 
     if (!shippableCartons.length) {
       return NextResponse.json(
-        { error: "All selected cartons are already in shipment", cartons: alreadyShipped.map((c) => c.cartonNo) },
+        {
+          error: "All selected cartons are already shipped or delivered",
+          inShipment: alreadyShipped.map((c) => c.cartonNo),
+          delivered: alreadyDelivered.map((c) => c.cartonNo),
+        },
         { status: 400 }
       )
     }
@@ -216,7 +226,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         shipment: { ...shipment, cartons: shipmentCartonNos },
-        skipped: alreadyShipped.map((c) => c.cartonNo),
+        skipped: [...alreadyShipped, ...alreadyDelivered].map((c) => c.cartonNo),
       },
       { status: 201 }
     )
