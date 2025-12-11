@@ -248,13 +248,6 @@ export function AppShell({ children, wide = false, contentClassName }: AppShellP
             </SidebarContent>
 
             <SidebarSeparator />
-
-            <SidebarFooter className="pb-4">
-              <div className="rounded-lg border border-sidebar-border bg-sidebar-accent/30 px-3 py-2 text-xs text-sidebar-foreground/80">
-                Click any item to view its page. Each section is currently marked as
-                &ldquo;Coming soon&rdquo; while designs are in progress.
-              </div>
-            </SidebarFooter>
           </Sidebar>
 
           <SidebarInset>
