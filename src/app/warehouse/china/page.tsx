@@ -8,6 +8,8 @@ import { AppShell } from "@/components/app-shell"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
+const DAY_MS = 24 * 60 * 60 * 1000
+
 type Carton = {
   id: number
   cartonNo: string
@@ -54,6 +56,8 @@ export default function ChinaWarehousePage() {
   const [boxModalSelectedIds, setBoxModalSelectedIds] = useState<Set<number>>(new Set())
   const [boxRequestNote, setBoxRequestNote] = useState("")
   const [creatingBox, setCreatingBox] = useState(false)
+  const [filterMode, setFilterMode] = useState<"all" | "today" | "yesterday" | "date">("today")
+  const [filterDate, setFilterDate] = useState<string>("")
 
   useEffect(() => {
     async function load() {
@@ -90,9 +94,43 @@ export default function ChinaWarehousePage() {
     []
   )
 
+  const dateMatches = useCallback(
+    (createdAt: string) => {
+      if (filterMode === "all") return true
+      const created = new Date(createdAt)
+      if (Number.isNaN(created.getTime())) return false
+
+      const normalize = (d: Date) => {
+        const copy = new Date(d)
+        copy.setHours(0, 0, 0, 0)
+        return copy.getTime()
+      }
+
+      if (filterMode === "today") {
+        return normalize(created) === normalize(new Date())
+      }
+      if (filterMode === "yesterday") {
+        return normalize(created) === normalize(new Date(Date.now() - DAY_MS))
+      }
+      if (filterMode === "date") {
+        if (!filterDate) return true
+        const picked = new Date(filterDate)
+        if (Number.isNaN(picked.getTime())) return true
+        return normalize(created) === normalize(picked)
+      }
+      return true
+    },
+    [filterDate, filterMode]
+  )
+
+  const filteredCartons = useMemo(
+    () => cartons.filter((c) => dateMatches(c.createdAt)),
+    [cartons, dateMatches]
+  )
+
   const visibleCartons = useMemo(
-    () => cartons.filter((c) => !isHidden(c)),
-    [cartons, isHidden]
+    () => filteredCartons.filter((c) => !isHidden(c)),
+    [filteredCartons, isHidden]
   )
 
   const allSelected = useMemo(
@@ -122,7 +160,7 @@ export default function ChinaWarehousePage() {
   }
 
   const display = useMemo(() => {
-    return [...cartons].sort((a, b) => {
+    return [...filteredCartons].sort((a, b) => {
       const aNo = (a.cartonNo || "").toUpperCase()
       const bNo = (b.cartonNo || "").toUpperCase()
       if (aNo === bNo) {
@@ -130,7 +168,7 @@ export default function ChinaWarehousePage() {
       }
       return aNo.localeCompare(bNo)
     })
-  }, [cartons])
+  }, [filteredCartons])
 
   const groupedDisplay = useMemo(() => {
     const groups: { cartonNo: string; items: Carton[] }[] = []
@@ -436,12 +474,48 @@ export default function ChinaWarehousePage() {
             <div className="sticky top-0 z-20 -mx-1 -mt-1 rounded-2xl border border-border/70 bg-background/80 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant={filterMode === "all" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setFilterMode("all")
+                      setFilterDate("")
+                    }}
+                  >
                     All
                   </Button>
-                  <Button variant="ghost" size="sm">
-                    Draft
+                  <Button
+                    variant={filterMode === "today" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setFilterMode("today")
+                      setFilterDate("")
+                    }}
+                  >
+                    Today
                   </Button>
+                  <Button
+                    variant={filterMode === "yesterday" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setFilterMode("yesterday")
+                      setFilterDate("")
+                    }}
+                  >
+                    Yesterday
+                  </Button>
+                  <div className="flex items-center gap-2 rounded-md border border-border px-2 py-1">
+                    <span className="text-xs text-muted-foreground">Date</span>
+                    <Input
+                      type="date"
+                      value={filterDate}
+                      onChange={(e) => {
+                        setFilterDate(e.target.value)
+                        setFilterMode("date")
+                      }}
+                      className="h-8 w-36 px-2 text-xs"
+                    />
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button asChild size="sm">
