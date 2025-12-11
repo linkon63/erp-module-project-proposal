@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   PackageSearch,
   Ship,
+  FileBarChart,
   Warehouse,
   type LucideIcon,
 } from "lucide-react"
@@ -88,6 +89,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { label: "Box Request", value: "Box Request", icon: Boxes, href: "/boxrequest" },
+  { label: "Reports", value: "Reports", icon: FileBarChart, href: "/reports" },
 ]
 
 type AppShellProps = {
