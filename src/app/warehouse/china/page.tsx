@@ -25,6 +25,7 @@ type Carton = {
   copyNumber: string | null
   remarks: string | null
   notes: string | null
+  billedAmount: number | null
   status: string
   createdAt: string
   childCartons: string[]
@@ -165,11 +166,24 @@ export default function ChinaWarehousePage() {
     return { totalWeight, totalCbm, totalPcs }
   }, [modalSelectedCartons])
 
+  const billingSubtotal = useMemo(
+    () =>
+      modalSelectedCartons.reduce(
+        (sum, c) => sum + (c.billedAmount ?? 0),
+        0
+      ),
+    [modalSelectedCartons]
+  )
+
   const estimatedPrice = useMemo(() => {
     const rate = Number(shipmentRate)
     if (Number.isNaN(rate)) return 0
     return totals.totalWeight * rate
   }, [shipmentRate, totals.totalWeight])
+
+  const shipmentTotal = useMemo(() => {
+    return billingSubtotal > 0 ? billingSubtotal : estimatedPrice
+  }, [billingSubtotal, estimatedPrice])
 
   const handleDelete = async (cartonId: number, cartonNo: string) => {
     const confirmDelete =
@@ -232,6 +246,14 @@ export default function ChinaWarehousePage() {
     try {
       setCreatingShipment(true)
       setError(null)
+      const ratePerKgRaw = Number(shipmentRate)
+      const hasValidRate = !Number.isNaN(ratePerKgRaw) && ratePerKgRaw > 0
+      if (!hasValidRate && billingSubtotal <= 0) {
+        setError("Enter a valid rate per kg or set billing prices on the cartons.")
+        setCreatingShipment(false)
+        return
+      }
+      const ratePerKg = hasValidRate ? ratePerKgRaw : 0
       const res = await fetch("/api/shipments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -239,7 +261,8 @@ export default function ChinaWarehousePage() {
           shipmentNo: shipmentNo || `SHIP-${Date.now()}`,
           cartonIds: modalSelectedCartons.map((c) => c.id),
           cartonNos: modalSelectedCartons.map((c) => c.cartonNo),
-          totalPrice: estimatedPrice,
+          totalPrice: shipmentTotal,
+          ratePerKg,
           status: "PLANNED",
         }),
       })
@@ -476,7 +499,7 @@ export default function ChinaWarehousePage() {
                       <th className="border border-border px-3 py-2 text-left">Copy #</th>
                       <th className="border border-border px-3 py-2 text-left">Remarks</th>
                       <th className="border border-border px-3 py-2 text-left">Notes</th>
-                      <th className="border border-border px-3 py-2 text-left">Child cartons</th>
+                      <th className="border border-border px-3 py-2 text-left">Billing price</th>
                       <th className="border border-border px-3 py-2 text-left">Created</th>
                       <th className="border border-border px-3 py-2 text-left">Actions</th>
                     </tr>
@@ -598,8 +621,8 @@ export default function ChinaWarehousePage() {
                                 {carton.notes ?? "—"}
                               </td>
                               <td className="border border-border px-3 py-2">
-                                {carton.childCartons && carton.childCartons.length
-                                  ? carton.childCartons.join(", ")
+                                {typeof carton.billedAmount === "number"
+                                  ? carton.billedAmount.toFixed(2)
                                   : "—"}
                               </td>
                               <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
@@ -661,6 +684,8 @@ export default function ChinaWarehousePage() {
               selectedCartons={selectedCartons}
               modalSelectedCartons={modalSelectedCartons}
               totals={totals}
+              billingSubtotal={billingSubtotal}
+              shipmentTotal={shipmentTotal}
               shipmentRate={shipmentRate}
               setShipmentRate={setShipmentRate}
               shipmentNo={shipmentNo}
@@ -699,6 +724,8 @@ function ShipmentModal({
   selectedCartons,
   modalSelectedCartons,
   totals,
+  billingSubtotal,
+  shipmentTotal,
   shipmentRate,
   setShipmentRate,
   shipmentNo,
@@ -715,6 +742,8 @@ function ShipmentModal({
   selectedCartons: Carton[]
   modalSelectedCartons: Carton[]
   totals: { totalWeight: number; totalCbm: number; totalPcs: number }
+  billingSubtotal: number
+  shipmentTotal: number
   shipmentRate: string
   setShipmentRate: (value: string) => void
   shipmentNo: string
@@ -768,6 +797,7 @@ function ShipmentModal({
                   <th className="border border-border px-3 py-2 text-left">Size (L/W/H)</th>
                   <th className="border border-border px-3 py-2 text-left">CBM</th>
                   <th className="border border-border px-3 py-2 text-left">Shipping mark</th>
+                  <th className="border border-border px-3 py-2 text-left">Billing price</th>
                 </tr>
               </thead>
               <tbody>
@@ -821,6 +851,11 @@ function ShipmentModal({
                     <td className="border border-border px-3 py-2">
                       {c.shippingMark ?? "—"}
                     </td>
+                    <td className="border border-border px-3 py-2">
+                      {typeof c.billedAmount === "number"
+                        ? c.billedAmount.toFixed(2)
+                        : "—"}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -851,6 +886,18 @@ function ShipmentModal({
             </div>
             <div className="rounded-lg bg-card p-3 text-sm text-muted-foreground">
               <div className="flex justify-between">
+                <span>Billing subtotal</span>
+                <span className="font-semibold text-foreground">
+                  ৳{billingSubtotal.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Weight est. (rate × kg)</span>
+                <span className="font-semibold text-foreground">
+                  ৳{estimatedPrice.toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span>Total weight</span>
                 <span className="font-semibold text-foreground">
                   {totals.totalWeight.toFixed(2)} kg
@@ -867,8 +914,8 @@ function ShipmentModal({
                 <span className="font-semibold text-foreground">{totals.totalPcs}</span>
               </div>
               <div className="mt-3 flex justify-between text-base font-semibold text-foreground">
-                <span>Estimated price</span>
-                <span>৳{estimatedPrice.toFixed(2)}</span>
+                <span>Shipment total</span>
+                <span>৳{shipmentTotal.toFixed(2)}</span>
               </div>
             </div>
             <div className="flex items-center justify-end gap-2">

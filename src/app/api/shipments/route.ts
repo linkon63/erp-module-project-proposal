@@ -159,7 +159,10 @@ export async function POST(req: Request) {
       // compute per-carton charges
       const chargesById = new Map<number, number>()
       shippableCartons.forEach((c) => {
-        const charge = (c.weightKg ?? 0) * ratePerKg
+        const hasManualBill = (c.billedAmount ?? 0) > 0
+        const charge = hasManualBill
+          ? c.billedAmount ?? 0
+          : (c.weightKg ?? 0) * ratePerKg
         chargesById.set(c.id, charge)
       })
 

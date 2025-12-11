@@ -178,7 +178,7 @@ export default function ShipmentsPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      {shipment.status !== "DELIVERED" ? (
+                      {/* {shipment.status !== "DELIVERED" ? (
                         <Button
                           size="sm"
                           variant="outline"
@@ -211,7 +211,7 @@ export default function ShipmentsPage() {
                         >
                           {updatingId === shipment.id ? "Updating..." : "Mark delivered"}
                         </Button>
-                      ) : null}
+                      ) : null} */}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -235,59 +235,6 @@ export default function ShipmentsPage() {
                     <div className="mt-3 rounded-lg border border-dashed border-border/70 bg-muted/20 p-3 text-sm text-muted-foreground">
                       {shipment.cartonDetails && shipment.cartonDetails.length ? (
                         <>
-                          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-md bg-card/60 px-3 py-2">
-                            <div className="text-xs text-muted-foreground">
-                              Due: {due.toFixed(2)}
-                            </div>
-                            <Input
-                              value={collectInputs[shipment.id] ?? ""}
-                              onChange={(e) =>
-                                setCollectInputs((prev) => ({
-                                  ...prev,
-                                  [shipment.id]: e.target.value,
-                                }))
-                              }
-                              placeholder="Collect amount"
-                              className="h-8 w-32"
-                              inputMode="decimal"
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={async () => {
-                                const raw = collectInputs[shipment.id] ?? ""
-                                const amount = Number(raw)
-                                if (Number.isNaN(amount) || amount <= 0) {
-                                  if (typeof window !== "undefined") {
-                                    window.alert("Enter a valid amount to collect.")
-                                  }
-                                  return
-                                }
-                                const newCollected = collectedTotal + amount
-                                const res = await fetch(`/api/shipments?id=${shipment.id}`, {
-                                  method: "PUT",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ collectedAmount: newCollected }),
-                                })
-                                if (!res.ok) {
-                                  const body = (await res.json().catch(() => null)) as { error?: string } | null
-                                  const msg = body?.error ?? "Unable to record collection."
-                                  if (typeof window !== "undefined") window.alert(msg)
-                                  return
-                                }
-                                setShipments((prev) =>
-                                  prev.map((s) =>
-                                    s.id === shipment.id
-                                      ? { ...s, collectedAmount: newCollected }
-                                      : s
-                                  )
-                                )
-                                setCollectInputs((prev) => ({ ...prev, [shipment.id]: "" }))
-                              }}
-                            >
-                              Collect
-                            </Button>
-                          </div>
                       <div className="overflow-x-auto">
                         <table className="w-full min-w-[900px] border-collapse text-xs">
                           <thead className="bg-muted/40 text-muted-foreground">
