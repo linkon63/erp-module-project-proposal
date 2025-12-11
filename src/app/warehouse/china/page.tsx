@@ -476,12 +476,21 @@ export default function ChinaWarehousePage() {
                   Inventory workflows for China. Use the actions above to create
                   cartons, shipments, or box requests.
                 </p>
+                <div className="mt-1 flex flex-wrap gap-2 text-xs font-semibold">
+                  <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-emerald-800">
+                    Total cartons: {visibleCartons.length}
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-blue-800">
+                    Selected: {selected.size}
+                  </span>
+                </div>
               </div>
 
               <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[1250px] border-collapse text-sm">
+                <table className="w-full min-w-[1300px] border-collapse text-sm">
                   <thead>
                     <tr className="bg-muted/50 text-muted-foreground">
+                      <th className="border border-border px-3 py-2 text-left">SN</th>
                       <th className="border border-border px-3 py-2 text-left">
                         <input
                           type="checkbox"
@@ -512,24 +521,24 @@ export default function ChinaWarehousePage() {
                   <tbody className="[&_td]:align-middle">
                     {loading ? (
                       <tr>
-                      <td colSpan={17} className="border border-border px-3 py-4 text-center text-sm text-muted-foreground">
+                      <td colSpan={18} className="border border-border px-3 py-4 text-center text-sm text-muted-foreground">
                         Loading cartons...
                       </td>
                     </tr>
                   ) : error ? (
                     <tr>
-                      <td colSpan={17} className="border border-border px-3 py-4 text-center text-sm text-destructive">
+                      <td colSpan={18} className="border border-border px-3 py-4 text-center text-sm text-destructive">
                         {error}
                       </td>
                     </tr>
                   ) : display.length === 0 ? (
                     <tr>
-                      <td colSpan={17} className="border border-border px-3 py-4 text-center text-sm text-muted-foreground">
+                      <td colSpan={18} className="border border-border px-3 py-4 text-center text-sm text-muted-foreground">
                         No cartons found.
                       </td>
                       </tr>
                     ) : (
-                      groupedDisplay.map((group) => {
+                      groupedDisplay.map((group, groupIdx) => {
                         const selectableIds = group.items
                           .filter((item) => !isShippedStatus(item.status))
                           .map((item) => item.id)
@@ -550,8 +559,21 @@ export default function ChinaWarehousePage() {
                             <tr key={carton.id} className={rowClasses}>
                               {idx === 0 ? (
                                 <td
-                                  className="border border-border px-3 py-2"
+                                  className="border border-border px-3 py-2 text-xs font-semibold text-muted-foreground"
                                   rowSpan={group.items.length}
+                                >
+                                  {groupIdx + 1}
+                                </td>
+                              ) : null}
+                              {idx === 0 ? (
+                                <td
+                                  className={`border border-border px-3 py-2 ${selectableIds.length ? "cursor-pointer" : "opacity-60"}`}
+                                  rowSpan={group.items.length}
+                                  onClick={(e) => {
+                                    if (selectableIds.length === 0) return
+                                    if ((e.target as HTMLElement).tagName === "INPUT") return
+                                    toggleGroup(selectableIds)
+                                  }}
                                 >
                                   <input
                                     type="checkbox"
@@ -625,7 +647,7 @@ export default function ChinaWarehousePage() {
                               <td className="border border-border px-3 py-2">
                                 {carton.notes ?? "—"}
                               </td>
-                              <td className="border border-border px-3 py-2">
+                              <td className="border border-border bg-red-50 px-3 py-2 font-semibold text-red-700">
                                 {typeof carton.billedAmount === "number"
                                   ? carton.billedAmount.toFixed(2)
                                   : "—"}
@@ -856,7 +878,7 @@ function ShipmentModal({
                     <td className="border border-border px-3 py-2">
                       {c.shippingMark ?? "—"}
                     </td>
-                    <td className="border border-border px-3 py-2">
+                    <td className="border border-border bg-red-50 px-3 py-2 font-semibold text-red-700">
                       {typeof c.billedAmount === "number"
                         ? c.billedAmount.toFixed(2)
                         : "—"}
