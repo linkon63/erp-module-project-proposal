@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
+    "db:seed:today": "node prisma/seed-today.js",
     "db:reset": "prisma migrate reset --force --skip-generate"
   },
   "dependencies": {

@@ -510,7 +510,12 @@ export default function ChinaWarehousePage() {
       {() => (
         <>
           <div className="flex flex-col gap-6">
-            <div className="sticky top-0 z-20 -mx-1 -mt-1 rounded-2xl bg-background/80 px-4 py-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70">
+            <div className="sticky top-0 z-20 -mx-1 -mt-1 
+            rounded-2xl border border-border/70
+            bg-background/80 px-4 py-3
+            shadow-sm backdrop-blur
+            supports-backdrop-filter:bg-background/70
+            ">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
@@ -1234,12 +1239,12 @@ function CartonSearch({
       />
       <Button
         size="sm"
-        variant="outline"
-        className="h-8 px-2 text-xs text-red-600 hover:text-red-700"
+        variant="ghost"
+        className="h-8 px-2 text-xs"
         onClick={onClear}
         disabled={!value}
       >
-        ✕
+        Clear
       </Button>
       <div className="text-[11px] font-medium text-muted-foreground">
         Fields: Carton #, Written #, Name (EN/CN), Tracking #
