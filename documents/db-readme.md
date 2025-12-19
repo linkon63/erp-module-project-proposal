@@ -8,6 +8,7 @@
 erDiagram
   Warehouse ||--o{ Carton : stores
   Goods ||--o{ Carton : describes
+  Customer ||--o{ Carton : owns
   Carton ||--o{ BoxRequest : "requested for printing"
   Shipment {
     string shipmentNo
@@ -35,6 +36,10 @@ erDiagram
     string name
     string nameCn
   }
+  Customer {
+    string name
+    string phone
+  }
   BoxRequest {
     string printedCartonNo
     string status
@@ -46,6 +51,8 @@ erDiagram
   - 1:N **Carton**
 - **Goods** (`id`, `name` unique, `nameCn?`, `shippingMark?`, `isActive`, timestamps)
   - 1:N **Carton**
+- **Customer** (`id`, `name` unique, `phone?`, `notes?`, timestamps)
+  - 1:N **Carton**
 - **Carton**
   - Keys: `id`
   - Identities: `cartonNo`, `writtenCartonNo` (unique), `trackingNo` (unique)
@@ -54,7 +61,7 @@ erDiagram
   - Status: `status` (default `AT_CHINA_WH`), `deliveredAt?`
   - Flags/structure: `isCombinedCarton` (default false), `childCartons` (JSON string list), `printedCartonNo?`
   - Meta: `packNo?`, `shippingMark?`, `remarks?`, `copyNumber?`, `notes?`
-  - FKs: `goodsId` → Goods, `warehouseId?` → Warehouse
+  - FKs: `goodsId` → Goods, `warehouseId?` → Warehouse, `customerId?` → Customer
   - Relations: 1:N **BoxRequest**
 - **Shipment**
   - Keys: `id`, `shipmentNo` unique

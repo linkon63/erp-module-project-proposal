@@ -16,8 +16,8 @@ Authentication: none (prototype).
 
 ### Create
 - `POST /api/cartons`
-- Body (JSON, required): `cartonNo`, and goods via `goodsId` **or** `goodsNameEn` + `goodsNameCn`.
-- Optional: `writtenCartonNo`, `trackingNo`, `billedAmount`, `goodsNameCn`, `goodsNameEn`, `packNo`, `unitPcs`, `weightKg`, `lengthCm`, `widthCm`, `heightCm`, `cbm`, `unitPrice`, `currencyCode`, `shippingMark`, `remarks`, `copyNumber`, `notes`, `warehouseId`, `status`.
+- Body (JSON, required): `cartonNo`, `goodsId` (product), `customerId`.
+- Optional: `goodsNameEn` + `goodsNameCn` (will upsert products), `writtenCartonNo`, `trackingNo`, `packNo`, `unitPcs`, `weightKg`, `lengthCm`, `widthCm`, `heightCm`, `cbm`, `unitPrice`, `currencyCode`, `shippingMark`, `remarks`, `copyNumber`, `notes`, `warehouseId`, `status`.
 - Behavior: upserts goods when names provided; picks first active warehouse if `warehouseId` absent; sets `status` to `AT_CHINA_WH` by default; initializes `childCartons` to `[]`.
 - Response: `201 { carton }` or `400/500 { error }`.
 
@@ -74,6 +74,18 @@ Authentication: none (prototype).
 - Optional: `notes`.
 - Behavior: updates requests to `APPROVED`, updates cartons’ `cartonNo`/`printedCartonNo`, sets status to `AT_CHINA_WH`.
 - Response: `200 { requests }` (bulk) or `{ request, carton }` (single) or error.
+
+## Customers
+
+- `GET /api/customers` (or `?id=`) – list or fetch one.
+- `POST /api/customers` – body: `name` (required, unique), `phone?`, `notes?`.
+- `PUT /api/customers?id=` – update `name?`, `phone?`, `notes?`.
+
+## Products (Goods)
+
+- `GET /api/products` (or `?id=`) – list or fetch one.
+- `POST /api/products` – body: `name` (required, unique), `nameCn?`, `shippingMark?`.
+- `PUT /api/products?id=` – update `name?`, `nameCn?`, `shippingMark?`.
 
 ## Warehouses
 

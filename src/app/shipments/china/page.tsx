@@ -39,6 +39,7 @@ type CartonDetail = {
   billedAmount?: number | null
   collectedAmount?: number | null
   deliveredAt?: string | null
+  customer?: { name: string; phone: string | null }
   goods?: { name: string; nameCn: string | null }
 }
 

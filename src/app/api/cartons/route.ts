@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import type { Carton, Goods, Warehouse } from "@prisma/client"
+import type { Carton, Goods, Warehouse, Customer } from "@prisma/client"
 
 import { prisma } from "@/lib/prisma"
 
@@ -12,6 +12,7 @@ type CartonPayload = {
   writtenCartonNo?: string
   trackingNo?: string
   billedAmount?: number
+  customerId?: number
   goodsId?: number
   goodsNameEn?: string
   goodsNameCn?: string
@@ -51,6 +52,7 @@ function parseJsonArray(value: string | null): string[] {
 type CartonWithRelations = Carton & {
   goods: Goods
   warehouse: Warehouse | null
+  customer: Customer | null
 }
 
 function formatCarton(carton: CartonWithRelations) {
@@ -71,7 +73,7 @@ export async function GET(req: Request) {
     }
     const carton = await prisma.carton.findUnique({
       where: { id },
-      include: { goods: true, warehouse: true },
+      include: { goods: true, warehouse: true, customer: true },
     })
     if (!carton || carton.status === "DELETED") {
       return NextResponse.json({ error: "Carton not found" }, { status: 404 })
@@ -82,7 +84,7 @@ export async function GET(req: Request) {
   const cartons = await prisma.carton.findMany({
     where: { status: { not: "DELETED" } },
     orderBy: { createdAt: "desc" },
-    include: { goods: true, warehouse: true },
+    include: { goods: true, warehouse: true, customer: true },
   })
 
   return NextResponse.json({ cartons: cartons.map(formatCarton) })
@@ -93,6 +95,7 @@ export async function POST(req: Request) {
     const body = (await req.json()) as CartonPayload
 
     const cartonNo = body.cartonNo?.trim()
+    const customerId = body.customerId ? Number(body.customerId) : null
     const goodsNameEn = body.goodsNameEn?.trim()
     const goodsNameCn = body.goodsNameCn?.trim()
     const shippingMark = body.shippingMark?.trim()
@@ -104,6 +107,13 @@ export async function POST(req: Request) {
     if (!cartonNo || (!hasGoodsId && !hasGoodsNames)) {
       return NextResponse.json(
         { error: "cartonNo and goods (via goodsId or EN/CN names) are required" },
+        { status: 400 }
+      )
+    }
+
+    if (!customerId) {
+      return NextResponse.json(
+        { error: "customerId is required" },
         { status: 400 }
       )
     }
@@ -131,6 +141,14 @@ export async function POST(req: Request) {
         ? Number(requestedWarehouseId)
         : null
 
+    const customer = await prisma.customer.findUnique({ where: { id: customerId } })
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 }
+      )
+    }
+
     if (!warehouseId) {
       const firstWarehouse = await prisma.warehouse.findFirst({
         where: { isActive: true },
@@ -152,7 +170,8 @@ export async function POST(req: Request) {
         printedCartonNo: cartonNo,
         writtenCartonNo: body.writtenCartonNo?.trim(),
         trackingNo: body.trackingNo?.trim(),
-        billedAmount: parseNumber(body.billedAmount) ?? undefined,
+        billedAmount: undefined,
+        customerId,
         goodsId,
         packNo: body.packNo?.trim(),
         unitPcs: parseNumber(body.unitPcs) ?? undefined,
@@ -172,7 +191,7 @@ export async function POST(req: Request) {
         isCombinedCarton: false,
         childCartons: "[]",
       },
-      include: { goods: true, warehouse: true },
+      include: { goods: true, warehouse: true, customer: true },
     })
 
     return NextResponse.json(
@@ -205,7 +224,7 @@ export async function DELETE(req: Request) {
     const deleted = await prisma.carton.update({
       where: { id },
       data: { status: "DELETED" },
-      include: { goods: true, warehouse: true },
+      include: { goods: true, warehouse: true, customer: true },
     })
 
     return NextResponse.json({ carton: formatCarton(deleted) })
@@ -234,6 +253,7 @@ export async function PUT(req: Request) {
     const body = (await req.json()) as CartonPayload
 
     const cartonNo = body.cartonNo?.trim()
+    const customerId = body.customerId ? Number(body.customerId) : null
     const goodsNameEn = body.goodsNameEn?.trim()
     const goodsNameCn = body.goodsNameCn?.trim()
     const shippingMark = body.shippingMark?.trim()
@@ -245,6 +265,13 @@ export async function PUT(req: Request) {
     if (!cartonNo || (!hasGoodsId && !hasGoodsNames)) {
       return NextResponse.json(
         { error: "cartonNo and goods (via goodsId or EN/CN names) are required" },
+        { status: 400 }
+      )
+    }
+
+    if (!customerId) {
+      return NextResponse.json(
+        { error: "customerId is required" },
         { status: 400 }
       )
     }
@@ -272,6 +299,11 @@ export async function PUT(req: Request) {
         ? Number(requestedWarehouseId)
         : null
 
+    const customer = await prisma.customer.findUnique({ where: { id: customerId } })
+    if (!customer) {
+      return NextResponse.json({ error: "Customer not found" }, { status: 404 })
+    }
+
     if (!warehouseId) {
       const firstWarehouse = await prisma.warehouse.findFirst({
         where: { isActive: true },
@@ -294,7 +326,8 @@ export async function PUT(req: Request) {
         printedCartonNo: cartonNo,
         writtenCartonNo: body.writtenCartonNo?.trim() ?? null,
         trackingNo: body.trackingNo?.trim() ?? null,
-        billedAmount: parseNumber(body.billedAmount) ?? undefined,
+        billedAmount: undefined,
+        customerId,
         goodsId,
         packNo: body.packNo?.trim() ?? null,
         unitPcs: parseNumber(body.unitPcs) ?? undefined,
@@ -312,7 +345,7 @@ export async function PUT(req: Request) {
         warehouseId,
         status: body.status ?? undefined,
       },
-      include: { goods: true, warehouse: true },
+      include: { goods: true, warehouse: true, customer: true },
     })
 
     return NextResponse.json({ carton: formatCarton(updated) })
@@ -382,7 +415,7 @@ export async function PATCH(req: Request) {
           deliveredAt,
           status: normalizedStatus ?? (hasDeliveredFlag ? "DELIVERED" : undefined),
         },
-        include: { goods: true, warehouse: true },
+        include: { goods: true, warehouse: true, customer: true },
       })
 
       // keep shipment collected totals in sync

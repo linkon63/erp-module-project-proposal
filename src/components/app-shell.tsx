@@ -9,9 +9,11 @@ import {
   Building2,
   ChevronDown,
   LayoutDashboard,
+  Package,
   PackageSearch,
   Ship,
   FileBarChart,
+  Users,
   Warehouse,
   type LucideIcon,
 } from "lucide-react"
@@ -51,6 +53,8 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", value: "Dashboard", icon: LayoutDashboard, href: "/" },
+  { label: "Customers", value: "Customers", icon: Users, href: "/customers" },
+  { label: "Products", value: "Products", icon: Package, href: "/products" },
   {
     label: "Warehouse",
     value: "Warehouse",

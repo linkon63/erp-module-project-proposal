@@ -95,6 +95,7 @@ async function main() {
   await prisma.shipment.deleteMany()
   await prisma.carton.deleteMany()
   await prisma.goods.deleteMany()
+  await prisma.customer.deleteMany()
   await prisma.warehouse.deleteMany()
 
   const chinaWh = await prisma.warehouse.create({
@@ -110,13 +111,29 @@ async function main() {
     goodsRecords[record.name] = record
   }
 
+  const customerRecords = {}
+  for (const customer of customers) {
+    const record = await prisma.customer.create({
+      data: {
+        name: customer,
+        phone: `+8801${(100000000 + Math.floor(Math.random() * 899999999)).toString()}`,
+      },
+    })
+    customerRecords[record.name] = record
+  }
+
   let seq = 1
   const seeds = []
   const addBatch = (tag, count, options) => {
     for (let i = 0; i < count; i += 1) {
+      const customerNames = Object.keys(customerRecords)
+      const customerName = customerNames[(seq + i) % customerNames.length]
       seeds.push({
         tag,
-        data: buildCarton(seq, { ...options, goodsRecords }),
+        data: {
+          ...buildCarton(seq, { ...options, goodsRecords }),
+          customerId: customerRecords[customerName]?.id ?? null,
+        },
       })
       seq += 1
     }

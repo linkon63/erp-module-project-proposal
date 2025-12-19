@@ -33,11 +33,25 @@ model Goods {
   cartons      Carton[]
 }
 
+model Customer {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  phone     String?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  cartons   Carton[]
+}
+
 model Carton {
   id               Int       @id @default(autoincrement())
   cartonNo         String    
   writtenCartonNo  String    @unique
   trackingNo       String    @unique
+
+  customerId       Int?
+  customer         Customer? @relation(fields: [customerId], references: [id])
 
   goodsId          Int
   goods            Goods     @relation(fields: [goodsId], references: [id])

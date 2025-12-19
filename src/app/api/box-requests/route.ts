@@ -52,7 +52,7 @@ export async function GET() {
   const requests = await prisma.boxRequest.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      carton: { include: { goods: true, warehouse: true } },
+      carton: { include: { goods: true, warehouse: true, customer: true } },
     },
   })
 
@@ -93,7 +93,7 @@ export async function POST(req: Request) {
               notes: req.notes ?? body.notes ?? undefined,
               status: "PENDING",
             },
-            include: { carton: true },
+            include: { carton: { include: { goods: true, warehouse: true, customer: true } } },
           })
         )
       )
@@ -159,7 +159,7 @@ export async function PUT(req: Request) {
 
       const requests = await prisma.boxRequest.findMany({
         where: { id: { in: idsToApprove } },
-        include: { carton: true },
+        include: { carton: { include: { goods: true, warehouse: true, customer: true } } },
       })
       if (requests.length !== idsToApprove.length) {
         return NextResponse.json(
@@ -191,7 +191,7 @@ export async function PUT(req: Request) {
 
         return tx.boxRequest.findMany({
           where: { id: { in: idsToApprove } },
-          include: { carton: { include: { goods: true, warehouse: true } } },
+          include: { carton: { include: { goods: true, warehouse: true, customer: true } } },
         })
       })
 
@@ -214,10 +214,10 @@ export async function PUT(req: Request) {
       )
     }
 
-    const boxRequest = await prisma.boxRequest.findUnique({
-      where: { id },
-      include: { carton: { include: { goods: true, warehouse: true } } },
-    })
+  const boxRequest = await prisma.boxRequest.findUnique({
+    where: { id },
+    include: { carton: { include: { goods: true, warehouse: true, customer: true } } },
+  })
 
     if (!boxRequest) {
       return NextResponse.json({ error: "Box request not found" }, { status: 404 })
@@ -245,10 +245,10 @@ export async function PUT(req: Request) {
       return updated
     })
 
-    const refreshed = await prisma.boxRequest.findUnique({
-      where: { id },
-      include: { carton: { include: { goods: true, warehouse: true } } },
-    })
+  const refreshed = await prisma.boxRequest.findUnique({
+    where: { id },
+    include: { carton: { include: { goods: true, warehouse: true, customer: true } } },
+  })
 
     return NextResponse.json({
       request: updatedRequest,

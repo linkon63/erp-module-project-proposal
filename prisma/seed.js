@@ -64,6 +64,25 @@ async function main() {
     goodsRecords[record.name] = record
   }
 
+  const customerList = [
+    { name: "Aman Traders", phone: "+8801300000001" },
+    { name: "Global Source", phone: "+8801300000002" },
+    { name: "Brightline Imports", phone: "+8801300000003" },
+    { name: "Nova Retail", phone: "+8801300000004" },
+    { name: "Skyline Mart", phone: "+8801300000005" },
+    { name: "Zenith Deals", phone: "+8801300000006" },
+  ]
+
+  const customerRecords = {}
+  for (const customer of customerList) {
+    const record = await prisma.customer.upsert({
+      where: { name: customer.name },
+      update: { phone: customer.phone },
+      create: customer,
+    })
+    customerRecords[record.name] = record
+  }
+
   const customers = [
     "Aman Traders",
     "Global Source",
@@ -127,6 +146,7 @@ async function main() {
       copyNumber: `CPY-${padded}`,
       notes: `Note ${n}`,
       warehouseId: chinaWh.id,
+      customerId: customerRecords[customer]?.id ?? null,
     // Keep all cartons visible in the China warehouse table
       status: "AT_CHINA_WH",
       isCombinedCarton: false,

@@ -38,6 +38,7 @@ type Carton = {
   cbm?: number | null
   createdAt?: string
   goods?: { name?: string | null; nameCn?: string | null }
+  customer?: { name?: string | null; phone?: string | null }
 }
 
 type Shipment = {

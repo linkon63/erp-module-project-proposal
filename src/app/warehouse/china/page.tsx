@@ -27,7 +27,6 @@ type Carton = {
   copyNumber: string | null
   remarks: string | null
   notes: string | null
-  billedAmount: number | null
   status: string
   createdAt: string
   childCartons: string[]
@@ -35,6 +34,10 @@ type Carton = {
     name: string
     nameCn: string | null
   }
+  customer: {
+    name: string
+    phone: string | null
+  } | null
   warehouse: {
     code: string
     name: string
@@ -248,24 +251,13 @@ export default function ChinaWarehousePage() {
     return { totalWeight, totalCbm, totalPcs }
   }, [modalSelectedCartons])
 
-  const billingSubtotal = useMemo(
-    () =>
-      modalSelectedCartons.reduce(
-        (sum, c) => sum + (c.billedAmount ?? 0),
-        0
-      ),
-    [modalSelectedCartons]
-  )
-
   const estimatedPrice = useMemo(() => {
     const rate = Number(shipmentRate)
     if (Number.isNaN(rate)) return 0
     return totals.totalWeight * rate
   }, [shipmentRate, totals.totalWeight])
 
-  const shipmentTotal = useMemo(() => {
-    return billingSubtotal > 0 ? billingSubtotal : estimatedPrice
-  }, [billingSubtotal, estimatedPrice])
+  const shipmentTotal = estimatedPrice
 
   const handleDelete = async (cartonId: number, cartonNo: string) => {
     const confirmDelete =
@@ -330,12 +322,12 @@ export default function ChinaWarehousePage() {
       setError(null)
       const ratePerKgRaw = Number(shipmentRate)
       const hasValidRate = !Number.isNaN(ratePerKgRaw) && ratePerKgRaw > 0
-      if (!hasValidRate && billingSubtotal <= 0) {
-        setError("Enter a valid rate per kg or set billing prices on the cartons.")
+      if (!hasValidRate) {
+        setError("Enter a valid rate per kg to create a shipment.")
         setCreatingShipment(false)
         return
       }
-      const ratePerKg = hasValidRate ? ratePerKgRaw : 0
+      const ratePerKg = ratePerKgRaw
       const res = await fetch("/api/shipments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -626,6 +618,7 @@ export default function ChinaWarehousePage() {
                       <th className="border border-border px-3 py-2 text-left">Carton #</th>
                       <th className="border border-border px-3 py-2 text-left">Written #</th>
                       <th className="border border-border px-3 py-2 text-left">Name (EN / CN)</th>
+                      <th className="border border-border px-3 py-2 text-left">Customer</th>
                       <th className="border border-border px-3 py-2 text-left">Tracking #</th>
                       <th className="border border-border px-3 py-2 text-left">Pack #</th>
                       <th className="border border-border px-3 py-2 text-left">Unit pcs</th>
@@ -636,7 +629,6 @@ export default function ChinaWarehousePage() {
                       <th className="border border-border px-3 py-2 text-left">Copy #</th>
                       <th className="border border-border px-3 py-2 text-left">Remarks</th>
                       <th className="border border-border px-3 py-2 text-left">Notes</th>
-                      <th className="border border-border px-3 py-2 text-left">Billing price</th>
                       <th className="border border-border px-3 py-2 text-left">Created</th>
                       <th className="border border-border px-3 py-2 text-left">Actions</th>
                     </tr>
@@ -735,6 +727,14 @@ export default function ChinaWarehousePage() {
                                 </div>
                               </td>
                               <td className="border border-border px-3 py-2">
+                                <div className="flex flex-col text-xs text-muted-foreground">
+                                  <span className="text-sm font-medium text-foreground">
+                                    {carton.customer?.name ?? "—"}
+                                  </span>
+                                  <span>{carton.customer?.phone ?? ""}</span>
+                                </div>
+                              </td>
+                              <td className="border border-border px-3 py-2">
                                 {carton.trackingNo ?? "—"}
                               </td>
                               <td className="border border-border px-3 py-2">
@@ -773,11 +773,6 @@ export default function ChinaWarehousePage() {
                               </td>
                               <td className="border border-border px-3 py-2">
                                 {carton.notes ?? "—"}
-                              </td>
-                              <td className="border border-border bg-red-50 px-3 py-2 font-semibold text-red-700">
-                                {typeof carton.billedAmount === "number"
-                                  ? carton.billedAmount.toFixed(2)
-                                  : "—"}
                               </td>
                               <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
                                 {new Date(carton.createdAt).toLocaleString()}
@@ -838,13 +833,11 @@ export default function ChinaWarehousePage() {
               selectedCartons={selectedCartons}
               modalSelectedCartons={modalSelectedCartons}
               totals={totals}
-              billingSubtotal={billingSubtotal}
               shipmentTotal={shipmentTotal}
               shipmentRate={shipmentRate}
               setShipmentRate={setShipmentRate}
               shipmentNo={shipmentNo}
               setShipmentNo={setShipmentNo}
-              estimatedPrice={estimatedPrice}
               creating={creatingShipment}
             />
           ) : null}
@@ -878,13 +871,11 @@ function ShipmentModal({
   selectedCartons,
   modalSelectedCartons,
   totals,
-  billingSubtotal,
   shipmentTotal,
   shipmentRate,
   setShipmentRate,
   shipmentNo,
   setShipmentNo,
-  estimatedPrice,
   creating,
 }: {
   onClose: () => void
@@ -896,34 +887,36 @@ function ShipmentModal({
   selectedCartons: Carton[]
   modalSelectedCartons: Carton[]
   totals: { totalWeight: number; totalCbm: number; totalPcs: number }
-  billingSubtotal: number
   shipmentTotal: number
   shipmentRate: string
   setShipmentRate: (value: string) => void
   shipmentNo: string
   setShipmentNo: (value: string) => void
-  estimatedPrice: number
   creating: boolean
 }) {
-  const summaryByName = useMemo(() => {
-    const totals = new Map<
-      string,
-      { name: string; weight: number; cbm: number; count: number }
-    >()
-    const lastIndex = new Map<string, number>()
-
-    selectedCartons.forEach((carton, idx) => {
+  const productSummary = useMemo(() => {
+    const totals = new Map<string, { name: string; weight: number; cbm: number; count: number }>()
+    modalSelectedCartons.forEach((carton) => {
       const name = carton.goods?.name ?? "Unknown"
-      lastIndex.set(name, idx)
       const current = totals.get(name) ?? { name, weight: 0, cbm: 0, count: 0 }
       current.weight += carton.weightKg ?? 0
       current.cbm += carton.cbm ?? 0
       current.count += 1
       totals.set(name, current)
     })
+    return Array.from(totals.values()).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  }, [modalSelectedCartons])
 
-    return { totals, lastIndex }
-  }, [selectedCartons])
+  const customerSummary = useMemo(() => {
+    const totals = new Map<string, { name: string; count: number }>()
+    modalSelectedCartons.forEach((carton) => {
+      const name = carton.customer?.name ?? "Unassigned"
+      const current = totals.get(name) ?? { name, count: 0 }
+      current.count += 1
+      totals.set(name, current)
+    })
+    return Array.from(totals.values()).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+  }, [modalSelectedCartons])
 
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-background/80 backdrop-blur-sm">
@@ -964,6 +957,7 @@ function ShipmentModal({
                   <th className="border border-border px-3 py-2 text-left">Carton #</th>
                   <th className="border border-border px-3 py-2 text-left">Written #</th>
                   <th className="border border-border px-3 py-2 text-left">Name (EN / CN)</th>
+                  <th className="border border-border px-3 py-2 text-left">Customer</th>
                   <th className="border border-border px-3 py-2 text-left">Tracking #</th>
                   <th className="border border-border px-3 py-2 text-left">Pack #</th>
                   <th className="border border-border px-3 py-2 text-left">Unit pcs</th>
@@ -971,14 +965,10 @@ function ShipmentModal({
                   <th className="border border-border px-3 py-2 text-left">Size (L/W/H)</th>
                   <th className="border border-border px-3 py-2 text-left">CBM</th>
                   <th className="border border-border px-3 py-2 text-left">Shipping mark</th>
-                  <th className="border border-border px-3 py-2 text-left">Billing price</th>
                 </tr>
               </thead>
               <tbody>
-                {selectedCartons.map((c, idx) => {
-                  const name = c.goods?.name ?? "Unknown"
-                  const summary = summaryByName.totals.get(name)
-                  const isLast = summaryByName.lastIndex.get(name) === idx
+                {selectedCartons.map((c) => {
                   return (
                     <Fragment key={c.id}>
                       <tr className="bg-card">
@@ -998,19 +988,27 @@ function ShipmentModal({
                           {c.writtenCartonNo ?? "—"}
                         </td>
                         <td className="border border-border px-3 py-2">
-                          <div className="flex flex-col text-xs text-muted-foreground">
-                            <span className="text-sm font-medium text-foreground">
-                              {c.goods?.name ?? "—"}
-                            </span>
-                            <span>{c.goods?.nameCn ?? "—"}</span>
-                          </div>
-                        </td>
-                        <td className="border border-border px-3 py-2">
-                          {c.trackingNo ?? "—"}
-                        </td>
-                        <td className="border border-border px-3 py-2">
-                          {c.packNo ?? "—"}
-                        </td>
+                        <div className="flex flex-col text-xs text-muted-foreground">
+                          <span className="text-sm font-medium text-foreground">
+                            {c.goods?.name ?? "—"}
+                          </span>
+                          <span>{c.goods?.nameCn ?? "—"}</span>
+                        </div>
+                      </td>
+                      <td className="border border-border px-3 py-2">
+                        <div className="flex flex-col text-xs text-muted-foreground">
+                          <span className="text-sm font-medium text-foreground">
+                            {c.customer?.name ?? "—"}
+                          </span>
+                          <span>{c.customer?.phone ?? ""}</span>
+                        </div>
+                      </td>
+                      <td className="border border-border px-3 py-2">
+                        {c.trackingNo ?? "—"}
+                      </td>
+                      <td className="border border-border px-3 py-2">
+                        {c.packNo ?? "—"}
+                      </td>
                         <td className="border border-border px-3 py-2">
                           {c.unitPcs ?? "—"}
                         </td>
@@ -1024,45 +1022,16 @@ function ShipmentModal({
                             <span>H: {c.heightCm ?? "—"}</span>
                           </div>
                         </td>
-                        <td className="border border-border px-3 py-2">
-                          {c.cbm ?? "—"}
-                        </td>
-                        <td className="border border-border px-3 py-2">
-                          {c.shippingMark ?? "—"}
-                        </td>
-                        <td className="border border-border bg-red-50 px-3 py-2 font-semibold text-red-700">
-                          {typeof c.billedAmount === "number"
-                            ? c.billedAmount.toFixed(2)
-                            : "—"}
-                        </td>
-                      </tr>
-                      {isLast && summary ? (
-                        <tr key={`summary-${name}`} className="bg-muted/40">
-                          <td className="border border-border px-3 py-2" colSpan={7}>
-                            <span className="text-xs font-semibold text-muted-foreground">
-                              {summary.name} subtotal ({summary.count} cartons)
-                            </span>
-                          </td>
-                          <td className="border border-border px-3 py-2 font-semibold">
-                            {summary.weight.toFixed(2)}
-                          </td>
-                          <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
-                            —
-                          </td>
-                          <td className="border border-border px-3 py-2 font-semibold">
-                            {summary.cbm.toFixed(3)}
-                          </td>
-                          <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
-                            —
-                          </td>
-                          <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
-                            —
-                          </td>
-                        </tr>
-                      ) : null}
-                    </Fragment>
-                  )
-                })}
+                      <td className="border border-border px-3 py-2">
+                        {c.cbm ?? "—"}
+                      </td>
+                      <td className="border border-border px-3 py-2">
+                        {c.shippingMark ?? "—"}
+                      </td>
+                    </tr>
+                  </Fragment>
+                )
+              })}
               </tbody>
             </table>
           </div>
@@ -1091,18 +1060,6 @@ function ShipmentModal({
             </div>
             <div className="rounded-lg bg-card p-3 text-sm text-muted-foreground">
               <div className="flex justify-between">
-                <span>Billing subtotal</span>
-                <span className="font-semibold text-foreground">
-                  ৳{billingSubtotal.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span>Weight est. (rate × kg)</span>
-                <span className="font-semibold text-foreground">
-                  ৳{estimatedPrice.toFixed(2)}
-                </span>
-              </div>
-              <div className="flex justify-between">
                 <span>Total weight</span>
                 <span className="font-semibold text-foreground">
                   {totals.totalWeight.toFixed(2)} kg
@@ -1118,8 +1075,34 @@ function ShipmentModal({
                 <span>Total pcs</span>
                 <span className="font-semibold text-foreground">{totals.totalPcs}</span>
               </div>
+              <div className="mt-3 border-t border-border pt-3">
+                <p className="text-xs font-semibold text-muted-foreground">Products</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {productSummary.map((item) => (
+                    <span
+                      key={item.name}
+                      className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-foreground"
+                    >
+                      {item.name}: {item.count} ({item.weight.toFixed(1)} kg)
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-3 border-t border-border pt-3">
+                <p className="text-xs font-semibold text-muted-foreground">Customers</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {customerSummary.map((item) => (
+                    <span
+                      key={item.name}
+                      className="rounded-full bg-muted px-3 py-1 text-xs font-semibold text-foreground"
+                    >
+                      {item.name}: {item.count}
+                    </span>
+                  ))}
+                </div>
+              </div>
               <div className="mt-3 flex justify-between text-base font-semibold text-foreground">
-                <span>Shipment total</span>
+                <span>Shipment total (rate × kg)</span>
                 <span>৳{shipmentTotal.toFixed(2)}</span>
               </div>
             </div>

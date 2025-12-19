@@ -41,7 +41,7 @@ export async function GET() {
   const cartonDetails = allCartonNos.length
     ? await prisma.carton.findMany({
         where: { cartonNo: { in: allCartonNos } },
-        include: { goods: true, warehouse: true },
+        include: { goods: true, warehouse: true, customer: true },
       })
     : []
 
