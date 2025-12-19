@@ -388,25 +388,34 @@ export default function ShipmentsPage() {
                     >
                       {shipment.cartonDetails && shipment.cartonDetails.length ? (
                         <>
-                      <div className="overflow-x-auto">
-                        <table className="w-full min-w-[900px] border-collapse text-xs">
+                      {(() => {
+                        const totalWeight = shipment.cartonDetails?.reduce(
+                          (sum, c) => sum + (c.weightKg ?? 0),
+                          0
+                        ) ?? 0
+                        const totalBilled = shipment.cartonDetails?.reduce(
+                          (sum, c) => sum + (c.billedAmount ?? 0),
+                          0
+                        ) ?? 0
+                        const totalCollected = shipment.cartonDetails?.reduce(
+                          (sum, c) => sum + (c.collectedAmount ?? 0),
+                          0
+                        ) ?? 0
+                        const totalDue = Math.max(totalBilled - totalCollected, 0)
+                        return (
+                          <>
+                            <div className="overflow-x-auto">
+                              <table className="w-full min-w-[820px] border-collapse text-xs">
                           <thead className="bg-muted/40 text-muted-foreground">
                             <tr>
                               <th className="border border-border px-2 py-1 text-left">Carton #</th>
                               <th className="border border-border px-2 py-1 text-left">Written #</th>
                               <th className="border border-border px-2 py-1 text-left">Name (EN / CN)</th>
-                              <th className="border border-border px-2 py-1 text-left">Tracking #</th>
                               <th className="border border-border px-2 py-1 text-left">Pack #</th>
-                              <th className="border border-border px-2 py-1 text-left">Unit pcs</th>
                               <th className="border border-border px-2 py-1 text-left">Weight (kg)</th>
-                              <th className="border border-border px-2 py-1 text-left">Size (L/W/H)</th>
-                              <th className="border border-border px-2 py-1 text-left">CBM</th>
                               <th className="border border-border px-2 py-1 text-left">Shipping mark</th>
                               <th className="border border-border px-2 py-1 text-left">Billed</th>
-                              <th className="border border-border px-2 py-1 text-left">Collected</th>
                               <th className="border border-border px-2 py-1 text-left">Due</th>
-                              <th className="border border-border px-2 py-1 text-left">Delivered</th>
-                              <th className="border border-border px-2 py-1 text-left">Status</th>
                               <th className="border border-border px-2 py-1 text-left">Actions</th>
                             </tr>
                           </thead>
@@ -423,9 +432,6 @@ export default function ShipmentsPage() {
                                 )
                               const displayBilled = billed.toFixed(2)
                               const displayDue = due.toFixed(2)
-                              const deliveredLabel = c.deliveredAt
-                                ? new Date(c.deliveredAt).toLocaleDateString()
-                                : "—"
                               const statusUpper = (c.status ?? "").toUpperCase()
                               const isCartonDelivered =
                                 Boolean(c.deliveredAt) || statusUpper === "DELIVERED" || isShipmentDelivered
@@ -451,28 +457,11 @@ export default function ShipmentsPage() {
                                       <span>{c.goods?.nameCn ?? "—"}</span>
                                     </div>
                                   </td>
-                                  <td className="border border-border px-2 py-1">{c.trackingNo ?? "—"}</td>
                                   <td className="border border-border px-2 py-1">{c.packNo ?? "—"}</td>
-                                  <td className="border border-border px-2 py-1">{c.unitPcs ?? "—"}</td>
                                   <td className="border border-border px-2 py-1">{c.weightKg ?? "—"}</td>
-                                  <td className="border border-border px-2 py-1">
-                                    <div className="flex flex-col text-[11px] text-muted-foreground">
-                                      <span className="text-foreground">L: {c.lengthCm ?? "—"}</span>
-                                      <span>W: {c.widthCm ?? "—"}</span>
-                                      <span>H: {c.heightCm ?? "—"}</span>
-                                    </div>
-                                  </td>
-                                  <td className="border border-border px-2 py-1">{c.cbm ?? "—"}</td>
                                   <td className="border border-border px-2 py-1">{c.shippingMark ?? "—"}</td>
                                   <td className="border border-border px-2 py-1 text-right">{displayBilled}</td>
-                                  <td className="border border-border px-2 py-1 text-right">
-                                    {collected.toFixed(2)}
-                                  </td>
                                   <td className="border border-border px-2 py-1 text-right">{displayDue}</td>
-                                  <td className="border border-border px-2 py-1">{deliveredLabel}</td>
-                                  <td className="border border-border px-2 py-1 uppercase text-muted-foreground">
-                                    {c.status}
-                                  </td>
                                   <td className="border border-border px-2 py-1">
                                     {isCartonDelivered ? (
                                       <span className="text-xs font-semibold text-emerald-700">
@@ -584,7 +573,23 @@ export default function ShipmentsPage() {
                             })}
                           </tbody>
                         </table>
-                      </div>
+                            </div>
+                            <div className="mt-3 flex justify-end">
+                              <div className="flex flex-wrap gap-2 text-xs font-semibold text-muted-foreground">
+                                <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                                  Total weight: {totalWeight.toFixed(2)} kg
+                                </span>
+                                <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">
+                                  Total rate: {totalBilled.toFixed(2)}
+                                </span>
+                                <span className="rounded-full bg-rose-50 px-3 py-1 text-rose-700">
+                                  Due: {totalDue.toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          </>
+                        )
+                      })()}
                       </>
                     ) : shipment.cartons && shipment.cartons.length ? (
                       <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

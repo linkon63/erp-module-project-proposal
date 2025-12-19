@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Pencil, Trash2 } from "lucide-react"
 
@@ -905,6 +905,26 @@ function ShipmentModal({
   estimatedPrice: number
   creating: boolean
 }) {
+  const summaryByName = useMemo(() => {
+    const totals = new Map<
+      string,
+      { name: string; weight: number; cbm: number; count: number }
+    >()
+    const lastIndex = new Map<string, number>()
+
+    selectedCartons.forEach((carton, idx) => {
+      const name = carton.goods?.name ?? "Unknown"
+      lastIndex.set(name, idx)
+      const current = totals.get(name) ?? { name, weight: 0, cbm: 0, count: 0 }
+      current.weight += carton.weightKg ?? 0
+      current.cbm += carton.cbm ?? 0
+      current.count += 1
+      totals.set(name, current)
+    })
+
+    return { totals, lastIndex }
+  }, [selectedCartons])
+
   return (
     <div className="fixed inset-0 z-30 flex items-center justify-center bg-background/80 backdrop-blur-sm">
       <div className="w-full max-w-6xl rounded-2xl border border-border bg-card p-6 shadow-xl">
@@ -927,7 +947,7 @@ function ShipmentModal({
         <div className="mt-4 grid gap-4 lg:grid-cols-[2fr_1fr]">
           <div className="overflow-auto rounded-xl border border-border">
             <table className="w-full min-w-[1150px] border-collapse text-sm">
-              <thead className="bg-muted/40 text-muted-foreground">
+              <thead className="bg-muted/40 text-muted-foreground border-4">
                 <tr>
                   <th className="border border-border px-3 py-2 text-left">
                     <input
@@ -955,63 +975,94 @@ function ShipmentModal({
                 </tr>
               </thead>
               <tbody>
-                {selectedCartons.map((c) => (
-                  <tr key={c.id} className="bg-card">
-                    <td className="border border-border px-3 py-2">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={modalSelectedIds.has(c.id)}
-                        onChange={() => onToggleOne(c.id)}
-                        aria-label={`Select carton ${c.cartonNo} for shipment`}
-                      />
-                    </td>
-                    <td className="border border-border px-3 py-2 font-medium text-foreground">
-                      {c.cartonNo}
-                    </td>
-                    <td className="border border-border px-3 py-2">
-                      {c.writtenCartonNo ?? "—"}
-                    </td>
-                    <td className="border border-border px-3 py-2">
-                      <div className="flex flex-col text-xs text-muted-foreground">
-                        <span className="text-sm font-medium text-foreground">
-                          {c.goods?.name ?? "—"}
-                        </span>
-                        <span>{c.goods?.nameCn ?? "—"}</span>
-                      </div>
-                    </td>
-                    <td className="border border-border px-3 py-2">
-                      {c.trackingNo ?? "—"}
-                    </td>
-                    <td className="border border-border px-3 py-2">
-                      {c.packNo ?? "—"}
-                    </td>
-                    <td className="border border-border px-3 py-2">
-                      {c.unitPcs ?? "—"}
-                    </td>
-                    <td className="border border-border px-3 py-2">
-                      {c.weightKg ?? "—"}
-                    </td>
-                    <td className="border border-border px-3 py-2">
-                      <div className="flex flex-col text-xs text-muted-foreground">
-                        <span className="text-foreground">L: {c.lengthCm ?? "—"}</span>
-                        <span>W: {c.widthCm ?? "—"}</span>
-                        <span>H: {c.heightCm ?? "—"}</span>
-                      </div>
-                    </td>
-                    <td className="border border-border px-3 py-2">
-                      {c.cbm ?? "—"}
-                    </td>
-                    <td className="border border-border px-3 py-2">
-                      {c.shippingMark ?? "—"}
-                    </td>
-                    <td className="border border-border bg-red-50 px-3 py-2 font-semibold text-red-700">
-                      {typeof c.billedAmount === "number"
-                        ? c.billedAmount.toFixed(2)
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
+                {selectedCartons.map((c, idx) => {
+                  const name = c.goods?.name ?? "Unknown"
+                  const summary = summaryByName.totals.get(name)
+                  const isLast = summaryByName.lastIndex.get(name) === idx
+                  return (
+                    <Fragment key={c.id}>
+                      <tr className="bg-card">
+                        <td className="border border-border px-3 py-2">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4"
+                            checked={modalSelectedIds.has(c.id)}
+                            onChange={() => onToggleOne(c.id)}
+                            aria-label={`Select carton ${c.cartonNo} for shipment`}
+                          />
+                        </td>
+                        <td className="border border-border px-3 py-2 font-medium text-foreground">
+                          {c.cartonNo}
+                        </td>
+                        <td className="border border-border px-3 py-2">
+                          {c.writtenCartonNo ?? "—"}
+                        </td>
+                        <td className="border border-border px-3 py-2">
+                          <div className="flex flex-col text-xs text-muted-foreground">
+                            <span className="text-sm font-medium text-foreground">
+                              {c.goods?.name ?? "—"}
+                            </span>
+                            <span>{c.goods?.nameCn ?? "—"}</span>
+                          </div>
+                        </td>
+                        <td className="border border-border px-3 py-2">
+                          {c.trackingNo ?? "—"}
+                        </td>
+                        <td className="border border-border px-3 py-2">
+                          {c.packNo ?? "—"}
+                        </td>
+                        <td className="border border-border px-3 py-2">
+                          {c.unitPcs ?? "—"}
+                        </td>
+                        <td className="border border-border px-3 py-2">
+                          {c.weightKg ?? "—"}
+                        </td>
+                        <td className="border border-border px-3 py-2">
+                          <div className="flex flex-col text-xs text-muted-foreground">
+                            <span className="text-foreground">L: {c.lengthCm ?? "—"}</span>
+                            <span>W: {c.widthCm ?? "—"}</span>
+                            <span>H: {c.heightCm ?? "—"}</span>
+                          </div>
+                        </td>
+                        <td className="border border-border px-3 py-2">
+                          {c.cbm ?? "—"}
+                        </td>
+                        <td className="border border-border px-3 py-2">
+                          {c.shippingMark ?? "—"}
+                        </td>
+                        <td className="border border-border bg-red-50 px-3 py-2 font-semibold text-red-700">
+                          {typeof c.billedAmount === "number"
+                            ? c.billedAmount.toFixed(2)
+                            : "—"}
+                        </td>
+                      </tr>
+                      {isLast && summary ? (
+                        <tr key={`summary-${name}`} className="bg-muted/40">
+                          <td className="border border-border px-3 py-2" colSpan={7}>
+                            <span className="text-xs font-semibold text-muted-foreground">
+                              {summary.name} subtotal ({summary.count} cartons)
+                            </span>
+                          </td>
+                          <td className="border border-border px-3 py-2 font-semibold">
+                            {summary.weight.toFixed(2)}
+                          </td>
+                          <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
+                            —
+                          </td>
+                          <td className="border border-border px-3 py-2 font-semibold">
+                            {summary.cbm.toFixed(3)}
+                          </td>
+                          <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
+                            —
+                          </td>
+                          <td className="border border-border px-3 py-2 text-xs text-muted-foreground">
+                            —
+                          </td>
+                        </tr>
+                      ) : null}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
